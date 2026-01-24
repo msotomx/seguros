@@ -1,0 +1,45 @@
+<ul class="nav nav-pills flex-column gap-1">
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
+       href="{% url 'ui:dashboard' %}">Dashboard</a>
+  </li>
+
+  {% if perms.crm.view_cliente %}
+  <li class="nav-item">
+    <a class="nav-link" href="/admin/crm/cliente/">Clientes</a>
+  </li>
+  {% endif %}
+
+  {% if perms.autos.view_vehiculo %}
+  <li class="nav-item">
+    <a class="nav-link" href="/admin/autos/vehiculo/">Vehículos</a>
+  </li>
+  {% endif %}
+
+  {% if perms.cotizador.view_cotizacion %}
+  <li class="nav-item">
+    <a class="nav-link" href="{% url 'ui:cotizacion_list' %}">Cotizaciones</a>
+  </li>
+  {% endif %}
+{% if perms.cotizador.view_cotizacion %}
+
+{% endif %}
+
+  {% if perms.polizas.view_poliza %}
+  <li class="nav-item">
+    <a class="nav-link" href="/admin/polizas/poliza/">Pólizas</a>
+  </li>
+  {% endif %}
+
+  {% if perms.finanzas.view_pago %}
+  <li class="nav-item">
+    <a class="nav-link" href="/admin/finanzas/pago/">Pagos</a>
+  </li>
+  {% endif %}
+
+  {% if perms.tarifas.view_reglatarifa %}
+  <li class="nav-item">
+    <a class="nav-link" href="/admin/tarifas/reglatarifa/">Tarifas (Reglas)</a>
+  </li>
+  {% endif %}
+</ul>

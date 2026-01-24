@@ -1,0 +1,99 @@
+{% extends "ui/base.html" %}
+{% block title %}Cotización #{{ cotizacion.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h3 class="mb-0">Cotización #{{ cotizacion.id }}</h3>
+    <div class="text-muted">
+      {{ cotizacion.cliente }} · {{ cotizacion.get_tipo_cotizacion_display }} · {{ cotizacion.vigencia_desde }} → {{ cotizacion.vigencia_hasta }}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'ui:cotizacion_list' %}">Volver</a>
+    <a class="btn btn-outline-dark" href="/admin/cotizador/cotizacion/{{ cotizacion.id }}/change/">Abrir en Admin</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Datos generales</div>
+        <div class="small text-muted">Estatus</div>
+        <div class="mb-2"><span class="badge bg-secondary">{{ cotizacion.get_estatus_display }}</span></div>
+
+        <div class="small text-muted">Forma de pago preferida</div>
+        <div class="mb-2">{{ cotizacion.forma_pago_preferida|default:"-" }}</div>
+
+        <div class="small text-muted">Owner</div>
+        <div class="mb-2">{{ cotizacion.owner|default:"-" }}</div>
+
+        <div class="small text-muted">Notas</div>
+        <div class="text-body-secondary">{{ cotizacion.notas|default:"-" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Comparativo</div>
+        <div class="text-muted small mb-3">
+          Items ordenados por: seleccionado → ranking → prima total
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Selección</th>
+                <th>Aseguradora</th>
+                <th>Producto</th>
+                <th>Forma pago</th>
+                <th>Meses</th>
+                <th class="text-end">Prima total</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="{% if it.seleccionada %}table-success{% endif %}">
+                  <td>
+                    {% if it.seleccionada %}
+                      <span class="badge bg-success">Seleccionada</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ it.aseguradora.nombre }}</td>
+                  <td>{{ it.producto.nombre_producto }}</td>
+                  <td>{{ it.forma_pago|default:"-" }}</td>
+                  <td>{{ it.meses|default:"-" }}</td>
+                  <td class="text-end fw-semibold">{{ it.prima_total }}</td>
+                  <td class="text-end">
+                    <div class="d-flex justify-content-end gap-2">
+                      <a class="btn btn-sm btn-outline-dark"
+                         href="/admin/cotizador/cotizacionitem/{{ it.id }}/change/">Ver item</a>
+
+                      {% if can_select %}
+                        <a class="btn btn-sm btn-primary"
+                           href="{% url 'ui:cotizacion_select_item' pk=cotizacion.id item_id=it.id %}">
+                          Seleccionar
+                        </a>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7" class="text-center text-muted py-4">Esta cotización no tiene items aún.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "ui/base.html" %}
+{% block title %}Nueva Cotización · Tipo{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h3 class="mb-0">Nueva Cotización</h3>
+    <div class="text-muted">Paso 2 · Tipo de cotización</div>
+    <div class="text-muted small">Cliente: <b>{{ cliente }}</b></div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'ui:cotizacion_new_cliente' %}">Atrás</a>
+    <a class="btn btn-outline-secondary" href="{% url 'ui:dashboard' %}">Cancelar</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-1">Individual</h5>
+        <div class="text-muted mb-3">Cotizar un solo vehículo para el cliente.</div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="tipo" value="INDIVIDUAL">
+          <button class="btn btn-primary">Continuar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-1">Flotilla</h5>
+        <div class="text-muted mb-3">Cotizar múltiples vehículos (empresas).</div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="tipo" value="FLOTILLA">
+          <button class="btn btn-outline-primary">Continuar</button>
+        </form>
+        <div class="text-muted small mt-2">
+          (La pantalla de flotilla la implementamos en el siguiente bloque.)
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

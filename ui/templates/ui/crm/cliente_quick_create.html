@@ -1,0 +1,121 @@
+{% extends "ui/base.html" %}
+{% block title %}Crear Cliente{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h3 class="mb-0">Crear Cliente</h3>
+    <div class="text-muted">Alta rápida (Prospecto) · Wizard Nueva Cotización</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'ui:cotizacion_new_cliente' %}">
+    Volver
+  </a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Tipo de cliente</label>
+          {{ form.tipo_cliente }}
+          {% if form.tipo_cliente.errors %}
+            <div class="text-danger small">{{ form.tipo_cliente.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-8">
+          <label class="form-label small">Nombre comercial (si es empresa)</label>
+          {{ form.nombre_comercial }}
+          {% if form.nombre_comercial.errors %}
+            <div class="text-danger small">{{ form.nombre_comercial.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Nombre (si es persona)</label>
+          {{ form.nombre }}
+          {% if form.nombre.errors %}
+            <div class="text-danger small">{{ form.nombre.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Apellido paterno</label>
+          {{ form.apellido_paterno }}
+          {% if form.apellido_paterno.errors %}
+            <div class="text-danger small">{{ form.apellido_paterno.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Apellido materno</label>
+          {{ form.apellido_materno }}
+          {% if form.apellido_materno.errors %}
+            <div class="text-danger small">{{ form.apellido_materno.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4"> 
+          <label class="form-label small">RFC</label>
+          {{ form.rfc }}
+          {% if form.rfc.errors %}
+            <div class="text-danger small">{{ form.rfc.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Teléfono</label>
+          {{ form.telefono_principal }}
+          {% if form.telefono_principal.errors %}
+            <div class="text-danger small">{{ form.telefono_principal.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Email</label>
+          {{ form.email_principal }}
+          {% if form.email_principal.errors %}
+            <div class="text-danger small">{{ form.email_principal.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label small">Origen</label>
+          {{ form.origen }}
+          {% if form.origen.errors %}
+            <div class="text-danger small">{{ form.origen.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12">
+          <label class="form-label small">Notas</label>
+          {{ form.notas }}
+          {% if form.notas.errors %}
+            <div class="text-danger small">{{ form.notas.errors }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary">Guardar y continuar</button>
+        <a class="btn btn-outline-secondary" href="{% url 'ui:cotizacion_new_cliente' %}">
+          Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="mt-2 text-muted small">
+  Al guardar, el cliente quedará seleccionado automáticamente para continuar con la cotización.
+</div>
+{% endblock %}

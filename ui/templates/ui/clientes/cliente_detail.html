@@ -1,0 +1,75 @@
+{% extends "ui/base.html" %}
+{% block title %}Cliente{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h3 class="mb-0">{{ cliente }}</h3>
+    <div class="text-muted">
+      {{ cliente.get_tipo_cliente_display }} · {{ cliente.get_estatus_display }}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    {% if perms.crm.change_cliente %}
+      <a class="btn btn-outline-secondary"
+         href="{% url 'ui:cliente_update' pk=cliente.id %}">
+        Editar
+      </a>
+    {% endif %}
+    <a class="btn btn-outline-primary"
+       href="{% url 'ui:cotizacion_new_cliente' %}?cliente={{ cliente.id }}">
+      Nueva cotización
+    </a>
+    <a class="btn btn-outline-secondary"
+       href="{% url 'ui:cliente_list' %}">
+      Volver
+    </a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Datos generales</div>
+
+        <div class="small text-muted">RFC</div>
+        <div class="mb-2">{{ cliente.rfc|default:"-" }}</div>
+
+        <div class="small text-muted">Email</div>
+        <div class="mb-2">{{ cliente.email_principal|default:"-" }}</div>
+
+        <div class="small text-muted">Teléfono</div>
+        <div class="mb-2">{{ cliente.telefono_principal|default:"-" }}</div>
+
+        <div class="small text-muted">Origen</div>
+        <div class="mb-2">{{ cliente.origen|default:"-" }}</div>
+
+        <div class="small text-muted">Owner</div>
+        <div>{{ cliente.owner|default:"-" }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Notas</div>
+        <div class="text-muted">
+          {{ cliente.notas|default:"Sin notas" }}
+        </div>
+
+        <hr>
+
+        <div class="fw-semibold mb-2">Resumen</div>
+        <ul class="mb-0">
+          <li>Cotizaciones: {{ cliente.cotizaciones.count }}</li>
+          <li>Vehículos: {{ cliente.vehiculos.count }}</li>
+          <li>Pólizas: {{ cliente.polizas.count }}</li>
+          <li>Incidentes: {{ cliente.incidentes.count }}</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

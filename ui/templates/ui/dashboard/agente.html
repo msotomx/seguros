@@ -1,0 +1,122 @@
+{% extends "ui/base.html" %}
+{% block title %}Dashboard (Agente){% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div>
+    <h3 class="mb-0">Dashboard · Agente</h3>
+    <div class="text-muted">
+      Periodo: {{ kpi.period.start }} → {{ kpi.period.end|date:"Y-m-d" }} (exclusivo)
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary" href="{% url 'ui:cotizacion_list' %}">Ver cotizaciones</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Cotizaciones del mes</div>
+        <div class="display-6 fw-semibold">{{ kpi.counts.cot_mes }}</div>
+        <div class="text-muted small">Actividad comercial</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Cotizaciones pendientes</div>
+        <div class="display-6 fw-semibold">{{ kpi.counts.cot_pendientes }}</div>
+        <div class="text-muted small">Borrador + Enviada</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Pólizas vigentes</div>
+        <div class="display-6 fw-semibold">{{ kpi.counts.pol_vigentes }}</div>
+        <div class="text-muted small">Cartera activa</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">Pagos vencidos</div>
+        <div class="display-6 fw-semibold">{{ kpi.counts.pagos_vencidos }}</div>
+        <div class="text-muted small">Cobranza inmediata</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">Conversión (aprox)</div>
+          <span class="badge bg-success">{{ kpi.rates.conversion_pct }}%</span>
+        </div>
+        <div class="text-muted small">
+          Pólizas emitidas este mes / Cotizaciones del mes
+        </div>
+
+        <hr>
+
+        <div class="fw-semibold mb-1">Comisiones pendientes</div>
+        <div class="fs-4 fw-semibold">{{ kpi.money.com_pendiente_total }}</div>
+        <div class="text-muted small">Suma de comisiones en estatus PENDIENTE</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Últimas cotizaciones</div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>ID</th>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Estatus</th>
+                <th class="text-end">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in kpi.lists.ult_cot %}
+                <tr>
+                  <td>#{{ c.id }}</td>
+                  <td>{{ c.cliente }}</td>
+                  <td>{{ c.get_tipo_cotizacion_display }}</td>
+                  <td><span class="badge bg-secondary">{{ c.get_estatus_display }}</span></td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'ui:cotizacion_detail' pk=c.id %}">Abrir</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-3">Aún no hay cotizaciones.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-2 text-muted small">
+          Breakdown: Borrador={{ kpi.breakdown.BORRADOR|default:"0" }},
+          Enviada={{ kpi.breakdown.ENVIADA|default:"0" }},
+          Aceptada={{ kpi.breakdown.ACEPTADA|default:"0" }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

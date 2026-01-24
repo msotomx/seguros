@@ -1,0 +1,36 @@
+{% extends "ui/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h3 class="mb-0">Dashboard</h3>
+      <div class="text-muted">Resumen operativo según tus permisos</div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {% for c in cards %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="text-muted small">{{ c.title }}</div>
+                <div class="display-6 fw-semibold">{{ c.value }}</div>
+                <div class="text-muted small">{{ c.hint }}</div>
+              </div>
+              {% if c.url %}
+                <a class="btn btn-outline-primary btn-sm" href="{{ c.url }}">Ver</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info">No hay métricas disponibles para tu perfil.</div>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}
