@@ -36,8 +36,11 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
     tipo_cliente = models.CharField(max_length=10, choices=TipoCliente.choices, db_index=True)
     nombre_comercial = models.CharField(max_length=200, blank=True, default="")  # empresas
     nombre = models.CharField(max_length=120, blank=True, default="")            # persona
-    apellido_paterno = models.CharField(max_length=120, blank=True, default="")
-    apellido_materno = models.CharField(max_length=120, blank=True, default="")
+    apellido_paterno = models.CharField(max_length=50, blank=True, default="")
+    apellido_materno = models.CharField(max_length=50, blank=True, default="")
+    contacto_nombre = models.CharField(max_length=50, blank=True, default="")
+    contacto_email = models.EmailField(blank=True, default="")
+    contacto_telefono = models.CharField(max_length=30, blank=True, default="")
     rfc = models.CharField(max_length=20, blank=True, default="", db_index=True)
     curp = models.CharField(max_length=25, blank=True, default="")
     email_principal = models.EmailField(blank=True, default="", db_index=True)
@@ -57,6 +60,7 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
         blank=True,
         related_name="cliente_portal",
     )
+    portal_activo = models.BooleanField(default=True)
 
     class Meta:
         indexes = [
@@ -66,6 +70,8 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
         permissions = [
             ("manage_clientes", "Puede administrar clientes"),
             ("reassign_cliente_owner", "Puede reasignar cartera de clientes"),
+            ("manage_portal_activo", "Puede activar/desactivar portal de clientes"),
+
         ]
 
     def __str__(self):

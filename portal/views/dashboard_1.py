@@ -1,9 +1,8 @@
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from portal.mixins import ClientePortalRequiredMixin
 from cotizador.models import Cotizacion
-from polizas.models import Poliza
+from portal.mixins import ClientePortalRequiredMixin  # ajusta si tu mixin vive en otra ruta
 
 
 class PortalDashboardView(ClientePortalRequiredMixin, TemplateView):
@@ -16,7 +15,7 @@ class PortalDashboardView(ClientePortalRequiredMixin, TemplateView):
 
         hoy = timezone.localdate()
 
-        # ===== Cotizaciones activas (ENVIADA / ACEPTADA y vigencia vigente) =====
+        # Cotizaciones activas (portal)
         cotizaciones_activas_qs = (
             Cotizacion.objects
             .filter(
@@ -26,24 +25,8 @@ class PortalDashboardView(ClientePortalRequiredMixin, TemplateView):
             )
             .order_by("-created_at")
         )
+
         ctx["cotizaciones_activas_count"] = cotizaciones_activas_qs.count()
         ctx["cotizaciones_activas"] = cotizaciones_activas_qs[:5]
-
-        # ===== Pólizas vigentes =====
-        # Regla:
-        # - por fechas 
-        polizas_vigentes_qs = Poliza.objects.filter(
-            cliente=cliente,
-            vigencia_desde__lte=hoy,
-            vigencia_hasta__gte=hoy,
-        ).exclude(estatus=Poliza.Estatus.CANCELADA)
-
-        ctx["polizas_vigentes_count"] = polizas_vigentes_qs.count()
-        ctx["polizas_vigentes"] = polizas_vigentes_qs[:5]
-
-        # ===== Recibos pendientes =====
-        # Aún no existe modelo: lo dejamos como placeholder
-        ctx["recibos_pendientes_count"] = None
-        ctx["recibos_pendientes"] = []
 
         return ctx

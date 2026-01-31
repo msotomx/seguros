@@ -1,0 +1,71 @@
+{% extends "portal/base.html" %}
+{% block title %}Cotización {{ cotizacion.folio }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">Cotización {{ cotizacion.folio }}</h1>
+    <div class="text-muted small">
+      Estatus: {{ cotizacion.get_estatus_display }} ·
+      Vigencia: {{ cotizacion.vigencia_desde|date:"d/M/Y" }} – {{ cotizacion.vigencia_hasta|date:"d/M/Y" }}
+    </div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'cotizador_agentes:cotizacion_list' %}">Volver</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header"><strong>Cliente</strong></div>
+      <div class="card-body">
+        <div><strong>Nombre:</strong> {{ cotizacion.cliente.nombre_comercial|default:cotizacion.cliente.nombre }}</div>
+        <div><strong>Email:</strong> {{ cotizacion.cliente.email_principal }}</div>
+        <div><strong>Tel:</strong> {{ cotizacion.cliente.telefono_principal }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header"><strong>Vehículo</strong></div>
+      <div class="card-body">
+        {% with v=cotizacion.vehiculo %}
+          {% if v %}
+            <div><strong>Marca:</strong> {{ v.marca_texto }}</div>
+            <div><strong>Submarca:</strong> {{ v.submarca_texto }}</div>
+            <div><strong>Año:</strong> {{ v.modelo_anio }}</div>
+            <div><strong>Versión:</strong> {{ v.version|default:"—" }}</div>
+            <div><strong>Uso:</strong> {{ v.get_tipo_uso_display }}</div>
+            <div><strong>Placas:</strong> {{ v.placas|default:"—" }}</div>
+            <div><strong>VIN:</strong> {{ v.vin|default:"—" }}</div>
+          {% else %}
+            —
+          {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+
+  {% if cotizacion.notas %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><strong>Notas</strong></div>
+      <div class="card-body">{{ cotizacion.notas|linebreaksbr }}</div>
+    </div>
+  </div>
+  {% endif %}
+    {% if not cotizacion.cliente.user_portal %}
+    <form method="post" action="{% url 'cotizador_agentes:cotizacion_convertir_portal' cotizacion.folio %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-success"
+                onclick="return confirm('¿Crear acceso al portal para este cliente y enviar correo de activación?');">
+        Convertir a cliente portal
+        </button>
+    </form>
+    {% else %}
+    <span class="badge bg-success">Cliente con acceso al portal</span>
+    {% endif %}
+
+
+</div>
+{% endblock %}

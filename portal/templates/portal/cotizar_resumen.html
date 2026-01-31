@@ -1,0 +1,63 @@
+{% extends "portal/base.html" %}
+{% block title %}Resumen de cotización{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h1 class="h4 mb-0">Resumen de tu solicitud</h1>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'portal:cotizar' %}">
+        Nueva cotización
+      </a>
+    </div>
+
+    <div class="alert alert-success">
+      ¡Solicitud recibida! En breve te contactamos para enviarte opciones.
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><strong>Datos del cliente</strong></div>
+      <div class="card-body">
+        <div><strong>Nombre:</strong>
+          {{ cotizacion.cliente.nombre_comercial|default:cotizacion.cliente.nombre|default:"—" }}
+        </div>
+        <div><strong>Email:</strong> {{ cotizacion.cliente.email_principal|default:"—" }}</div>
+        <div><strong>Teléfono:</strong> {{ cotizacion.cliente.telefono_principal|default:"—" }}</div>
+        <div><strong>Estatus:</strong> {{ cotizacion.cliente.get_estatus_display|default:cotizacion.cliente.estatus }}</div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><strong>Vehículo</strong></div>
+      <div class="card-body">
+        {% with v=cotizacion.vehiculo %}
+          <div><strong>Marca:</strong> {{ v.marca_texto|default:"—" }}</div>
+          <div><strong>Submarca:</strong> {{ v.submarca_texto|default:"—" }}</div>
+          <div><strong>Año:</strong> {{ v.modelo_anio|default:"—" }}</div>
+          <div><strong>Versión:</strong> {{ v.version|default:"—" }}</div>
+          <div><strong>Tipo de uso:</strong> {{ v.get_tipo_uso_display|default:v.tipo_uso }}</div>
+          <div><strong>Placas:</strong> {{ v.placas|default:"—" }}</div>
+          <div><strong>VIN:</strong> {{ v.vin|default:"—" }}</div>
+        {% endwith %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><strong>Cotización</strong></div>
+      <div class="card-body">
+        <div><strong>Folio:</strong> {{ cotizacion.folio }}</div>
+        <div><strong>Tipo:</strong> {{ cotizacion.get_tipo_cotizacion_display }}</div>
+        <div><strong>Estatus:</strong> {{ cotizacion.get_estatus_display }}</div>
+        <div><strong>Vigencia:</strong>
+          {{ cotizacion.vigencia_desde|date:"d/M/Y" }} – {{ cotizacion.vigencia_hasta|date:"d/M/Y" }}
+        </div>
+        {% if cotizacion.notas %}
+          <div class="mt-2"><strong>Notas:</strong><br>{{ cotizacion.notas|linebreaksbr }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

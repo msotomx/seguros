@@ -2,25 +2,76 @@
 {% block title %}Cliente{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between mb-3">
-  <div>
-    <h3 class="mb-0">{{ cliente }}</h3>
-    <div class="text-muted">
-      {{ cliente.get_tipo_cliente_display }} · {{ cliente.get_estatus_display }}
+<div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2 mb-3">
+
+  <!-- Estado portal + tipo/estatus -->
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge {% if cliente.portal_activo %}bg-success{% else %}bg-danger{% endif %}">
+      Portal: {% if cliente.portal_activo %}Activo{% else %}Suspendido{% endif %}
+    </span>
+
+    <span class="badge bg-light text-dark border">
+      {{ cliente.get_tipo_cliente_display }}
+    </span>
+
+    <span class="badge
+      {% if cliente.estatus == 'ACTIVO' %}bg-success
+      {% elif cliente.estatus == 'INACTIVO' %}bg-secondary
+      {% else %}bg-warning text-dark{% endif %}
+    ">
+      {{ cliente.get_estatus_display }}
+    </span>
+  </div>
+
+  <!-- Título -->
+  <div class="flex-grow-1">
+    <h3 class="mb-0">
+      {% if cliente.tipo_cliente == "EMPRESA" %}
+        {{ cliente.nombre_comercial|default:cliente }}
+      {% else %}
+        {{ cliente.nombre|default:"" }} {{ cliente.apellido_paterno|default:"" }} {{ cliente.apellido_materno|default:"" }}
+      {% endif %}
+    </h3>
+    <div class="text-muted small">
+      RFC: <span class="fw-semibold">{{ cliente.rfc|default:"-" }}</span>
+      <span class="mx-2">•</span>
+      Origen: <span class="fw-semibold">{{ cliente.origen|default:"-" }}</span>
     </div>
   </div>
-  <div class="d-flex gap-2">
+
+  <!-- Acciones -->
+  <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+
+    {% if perms.crm.manage_portal_activo %}
+      <form method="post" action="{% url 'ui:cliente_portal_toggle' cliente.pk %}" class="d-inline">
+        {% csrf_token %}
+        {% if cliente.portal_activo %}
+          <button class="btn btn-outline-warning btn-sm" type="submit"
+                  onclick="return confirm('¿Suspender acceso al portal para este cliente?');">
+            Suspender portal
+          </button>
+        {% else %}
+          <button class="btn btn-outline-success btn-sm" type="submit"
+                  onclick="return confirm('¿Reactivar acceso al portal para este cliente?');">
+            Reactivar portal
+          </button>
+        {% endif %}
+      </form>
+    {% endif %}
+
     {% if perms.crm.change_cliente %}
-      <a class="btn btn-outline-secondary"
+      <a class="btn btn-outline-secondary btn-sm"
          href="{% url 'ui:cliente_update' pk=cliente.id %}">
         Editar
       </a>
     {% endif %}
-    <a class="btn btn-outline-primary"
+
+    <a class="btn btn-outline-primary btn-sm"
        href="{% url 'ui:cotizacion_new_cliente' %}?cliente={{ cliente.id }}">
       Nueva cotización
     </a>
-    <a class="btn btn-outline-secondary"
+
+    <a class="btn btn-outline-secondary btn-sm"
        href="{% url 'ui:cliente_list' %}">
       Volver
     </a>
@@ -28,48 +79,177 @@
 </div>
 
 <div class="row g-3">
+  <!-- Columna izquierda: Datos -->
   <div class="col-12 col-lg-4">
+
     <div class="card shadow-sm">
       <div class="card-body">
-        <div class="fw-semibold mb-2">Datos generales</div>
 
-        <div class="small text-muted">RFC</div>
-        <div class="mb-2">{{ cliente.rfc|default:"-" }}</div>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="fw-semibold">Datos generales</div>
+          {% if cliente.user_portal %}
+            <span class="badge bg-primary">Usuario portal</span>
+          {% endif %}
+        </div>
 
-        <div class="small text-muted">Email</div>
-        <div class="mb-2">{{ cliente.email_principal|default:"-" }}</div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Email</div>
+          <div class="col-7">
+            {% if cliente.email_principal %}
+              <a href="mailto:{{ cliente.email_principal }}" class="text-decoration-none">
+                {{ cliente.email_principal }}
+              </a>
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
 
-        <div class="small text-muted">Teléfono</div>
-        <div class="mb-2">{{ cliente.telefono_principal|default:"-" }}</div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Teléfono</div>
+          <div class="col-7">
+            {% if cliente.telefono_principal %}
+              <a href="tel:{{ cliente.telefono_principal }}" class="text-decoration-none">
+                {{ cliente.telefono_principal }}
+              </a>
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
 
-        <div class="small text-muted">Origen</div>
-        <div class="mb-2">{{ cliente.origen|default:"-" }}</div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Contacto</div>
+          <div class="col-7">
+            {{ cliente.contacto_nombre|default:"-" }}
+          </div>
+        </div>
 
-        <div class="small text-muted">Owner</div>
-        <div>{{ cliente.owner|default:"-" }}</div>
-      </div>
-    </div>
-  </div>
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Email contacto</div>
+          <div class="col-7">
+            {{ cliente.contacto_email|default:"-" }}
+          </div>
+        </div>
 
-  <div class="col-12 col-lg-8">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="fw-semibold mb-2">Notas</div>
-        <div class="text-muted">
-          {{ cliente.notas|default:"Sin notas" }}
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Tel. contacto</div>
+          <div class="col-7">
+            {{ cliente.contacto_telefono|default:"-" }}
+          </div>
         </div>
 
         <hr>
 
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">RFC</div>
+          <div class="col-7 fw-semibold">
+            {{ cliente.rfc|default:"-" }}
+          </div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">CURP</div>
+          <div class="col-7">
+            {{ cliente.curp|default:"-" }}
+          </div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Owner</div>
+          <div class="col-7">
+            {{ cliente.owner|default:"Sin asignar" }}
+          </div>
+        </div>
+
+        <div class="row mb-2">
+          <div class="col-5 text-muted small">Usuario portal</div>
+          <div class="col-7">
+            {% if cliente.user_portal %}
+              <span class="badge bg-primary">{{ cliente.user_portal.username }}</span>
+            {% else %}
+              -
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
         <div class="fw-semibold mb-2">Resumen</div>
-        <ul class="mb-0">
-          <li>Cotizaciones: {{ cliente.cotizaciones.count }}</li>
-          <li>Vehículos: {{ cliente.vehiculos.count }}</li>
-          <li>Pólizas: {{ cliente.polizas.count }}</li>
-          <li>Incidentes: {{ cliente.incidentes.count }}</li>
+        <ul class="list-unstyled mb-0">
+          <li class="d-flex align-items-center justify-content-between py-1">
+            <span>Cotizaciones</span>
+            <span class="badge bg-secondary">{{ stats.cotizaciones|default:"0" }}</span>
+          </li>
+          <li class="d-flex align-items-center justify-content-between py-1">
+            <span>Vehículos</span>
+            <span class="badge bg-secondary">{{ stats.vehiculos|default:"0" }}</span>
+          </li>
+          <li class="d-flex align-items-center justify-content-between py-1">
+            <span>Pólizas</span>
+            <span class="badge bg-secondary">{{ stats.polizas|default:"0" }}</span>
+          </li>
+          <li class="d-flex align-items-center justify-content-between py-1">
+            <span>Incidentes</span>
+            <span class="badge bg-secondary">{{ stats.incidentes|default:"0" }}</span>
+          </li>
         </ul>
       </div>
     </div>
+
+  </div>
+
+  <!-- Columna derecha: Notas / Direcciones -->
+  <div class="col-12 col-lg-8">
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Notas</div>
+        <div class="border rounded p-3 bg-light">
+          {{ cliente.notas|default:"Sin notas" }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="fw-semibold mb-2">Direcciones</div>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="text-muted small mb-1">Fiscal</div>
+              {% if cliente.direccion_fiscal %}
+                <div class="fw-semibold">{{ cliente.direccion_fiscal }}</div>
+              {% else %}
+                <div class="text-muted">-</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="text-muted small mb-1">Contacto</div>
+              {% if cliente.direccion_contacto %}
+                <div class="fw-semibold">{{ cliente.direccion_contacto }}</div>
+              {% else %}
+                <div class="text-muted">-</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-3">
+
+        <div class="text-muted small">
+          Consejo: si el cliente tiene portal suspendido, seguirá existiendo su cuenta, pero no podrá navegar en <span class="fw-semibold">/portal</span>.
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}

@@ -7,7 +7,7 @@ from portal.forms import PortalClientePerfilForm
 
 
 class PortalPerfilView(ClientePortalRequiredMixin, UpdateView):
-    template_name = "portal/perfil_form.html"
+    template_name = "portal/perfil.html"
     form_class = PortalClientePerfilForm
     success_url = reverse_lazy("portal:dashboard")
 
@@ -17,3 +17,4 @@ class PortalPerfilView(ClientePortalRequiredMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Tus datos se guardaron correctamente.")
         return super().form_valid(form)
+

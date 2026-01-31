@@ -1,0 +1,131 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  <!-- Datos del cliente -->
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+          <h1 class="h4 mb-1">
+            {{ cliente.nombre_comercial|default:cliente.nombre|default:"Cliente" }}
+          </h1>
+          <div class="text-muted small">
+            RFC: {{ cliente.rfc|default:"—" }} ·
+            Email: {{ cliente.email_principal|default:"—" }} ·
+            Tel: {{ cliente.telefono_principal|default:"—" }}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small">Cotizaciones activas</div>
+        <div class="display-6">{{ cotizaciones_activas_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small">Pólizas vigentes</div>
+        <div class="display-6">{{ polizas_vigentes_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="text-muted small">Recibos pendientes</div>
+        <div class="display-6">—</div>
+        <div class="text-muted small">Próximamente</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cotizaciones activas -->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Cotizaciones activas</strong>
+        <span class="badge text-bg-primary">{{ cotizaciones_activas_count }}</span>
+      </div>
+
+      <div class="card-body p-0">
+        {% if cotizaciones_activas %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Estatus</th>
+                  <th>Vigencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in cotizaciones_activas %}
+                <tr>
+                  <td>{{ c.get_tipo_cotizacion_display }}</td>
+                  <td>{{ c.get_estatus_display }}</td>
+                  <td>{{ c.vigencia_desde|date:"d/M/Y" }} – {{ c.vigencia_hasta|date:"d/M/Y" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No tienes cotizaciones activas.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Pólizas vigentes -->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Pólizas vigentes</strong>
+        <span class="badge text-bg-success">{{ polizas_vigentes_count }}</span>
+      </div>
+
+      <div class="card-body p-0">
+        {% if polizas_vigentes %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th># Póliza</th>
+                  <th>Aseguradora</th>
+                  <th class="text-end">Vence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in polizas_vigentes %}
+                <tr>
+                  <td>{{ p.numero_poliza }}</td>
+                  <td>{{ p.aseguradora.nombre }}</td>
+                  <td class="text-end">{{ p.vigencia_hasta|date:"d/M/Y" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No tienes pólizas vigentes.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

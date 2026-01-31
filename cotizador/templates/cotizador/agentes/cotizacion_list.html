@@ -1,0 +1,91 @@
+{% extends "portal/base.html" %} {# o tu base interna #}
+{% block title %}Cotizaciones (Agentes){% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">Cotizaciones</h1>
+
+  <form method="get" class="d-flex gap-2">
+    <input class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Buscar folio, cliente, email, placas">
+    <select class="form-select form-select-sm" name="estatus">
+      <option value="">Estatus (todos)</option>
+      {% for val,label in estatus_choices %}
+        <option value="{{ val }}" {% if estatus == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-primary" type="submit">Filtrar</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-striped mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Folio</th>
+          <th>Cliente</th>
+          <th>Vehículo</th>
+          <th>Estatus</th>
+          <th>Origen</th>
+          <th>Creada</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cotizaciones %}
+        <tr>
+          <td><strong>{{ c.folio }}</strong></td>
+          <td>
+            {{ c.cliente.nombre_comercial|default:c.cliente.nombre }}
+            <div class="text-muted small">{{ c.cliente.email_principal }}</div>
+          </td>
+          <td class="small">
+            {% if c.vehiculo %}
+              {{ c.vehiculo.marca_texto }} {{ c.vehiculo.submarca_texto }} {{ c.vehiculo.modelo_anio }}
+              {% if c.vehiculo.version %}<div class="text-muted">{{ c.vehiculo.version }}</div>{% endif %}
+              {% if c.vehiculo.placas %}<div class="text-muted">Placas: {{ c.vehiculo.placas }}</div>{% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>{{ c.get_estatus_display }}</td>
+          <td>
+            {% if c.origen == "PORTAL_PUBLICO" %}
+                <span class="badge bg-success">Portal</span>
+            {% elif c.origen == "AGENTE" %}
+                <span class="badge bg-primary">Agente</span>
+            {% else %}
+                <span class="badge bg-secondary">{{ c.get_origen_display }}</span>
+            {% endif %}
+          </td>
+
+          <td class="small">{{ c.created_at|date:"d/M/Y H:i" }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{% url 'cotizador_agentes:cotizacion_detail' c.folio %}">
+              Ver
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted p-3">No hay cotizaciones.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm">
+    {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&estatus={{ estatus }}">Anterior</a></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+    {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ q }}&estatus={{ estatus }}">Siguiente</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

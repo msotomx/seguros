@@ -26,6 +26,8 @@ class ClienteAdmin(admin.ModelAdmin):
         "owner",
         "is_active",
         "created_at",
+        "user_portal",
+        "portal_activo",
     )
     search_fields = (
         "nombre_comercial",
@@ -47,7 +49,7 @@ class ClienteAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
     fieldsets = (
-        ("Tipo de cliente", {"fields": ("tipo_cliente", "estatus", "origen", "owner", "is_active")}),
+        ("Tipo de cliente", {"fields": ("tipo_cliente", "estatus", "origen", "owner", "is_active","user_portal","portal_activo")}),
         ("Datos generales", {"fields": ("nombre_comercial", "nombre", "apellido_paterno", "apellido_materno")}),
         ("Identificación", {"fields": ("rfc", "curp")}),
         ("Contacto", {"fields": ("email_principal", "telefono_principal")}),

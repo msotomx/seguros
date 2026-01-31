@@ -12,7 +12,14 @@ from .cotizaciones import (
     CotizacionWizardTipoView,
     CotizacionWizardVehiculoSelectView,
 )
-from .clientes import ClienteQuickCreateView
+from .clientes import (
+    ClienteQuickCreateView, 
+    cliente_portal_toggle, 
+    ClienteListView,
+    ClienteCreateView,
+    ClienteUpdateView,
+    ClienteDetailView,
+)
 
 __all__ = [
     "DashboardView",
@@ -23,4 +30,9 @@ __all__ = [
     "CotizacionWizardTipoView",
     "CotizacionWizardVehiculoSelectView",
     "ClienteQuickCreateView",
+    "cliente_portal_toggle",
+    "ClienteListView,"
+    "ClienteCreateView",
+    "ClienteUpdateView",
+    "ClienteDetailView",
 ]

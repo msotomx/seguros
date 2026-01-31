@@ -8,11 +8,45 @@ from autos.models import Vehiculo, Flotilla
 from catalogos.models import Aseguradora, ProductoSeguro, CoberturaCatalogo
 from tarifas.models import ReglaTarifa
 
+from django.db import transaction
+from django.utils import timezone
+
+# ---------------------------------------------------------------------
+# Folios de Cotizaciones 
+# ---------------------------------------------------------------------
+class FolioCotizacionCounter(models.Model):
+    anio = models.PositiveIntegerField(unique=True)
+    last = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.anio} -> {self.last}"
+
+    @classmethod
+    def next_folio(cls, anio: int) -> str:
+        with transaction.atomic():
+            counter, _ = cls.objects.select_for_update().get_or_create(anio=anio)
+            counter.last += 1
+            counter.save()
+            return f"COT-{anio}-{counter.last:06d}"
+
 # ---------------------------------------------------------------------
 # Cotizaciones / Comparativos (A + B)
 # ---------------------------------------------------------------------
 
 class Cotizacion(TimeStampedModel):
+    class Origen(models.TextChoices):
+        PORTAL_PUBLICO = "PORTAL_PUBLICO", "Portal público"
+        CRM = "CRM", "CRM interno"
+        AGENTE = "AGENTE", "Agente"
+        API = "API", "API"
+
+    origen = models.CharField(
+        max_length=20,
+        choices=Origen.choices,
+        default=Origen.CRM,
+        db_index=True,
+    )
+
     class Tipo(models.TextChoices):
         INDIVIDUAL = "INDIVIDUAL", "Individual"
         FLOTILLA = "FLOTILLA", "Flotilla"
@@ -27,8 +61,10 @@ class Cotizacion(TimeStampedModel):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
     flotilla = models.ForeignKey(Flotilla, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
-
+    
     tipo_cotizacion = models.CharField(max_length=20, choices=Tipo.choices, db_index=True)
+    folio = models.CharField(max_length=20, unique=True, db_index=True, blank=True, default="") 
+    
     vigencia_desde = models.DateField(db_index=True)
     vigencia_hasta = models.DateField(db_index=True)
 
@@ -66,6 +102,11 @@ class Cotizacion(TimeStampedModel):
             ("approve_cotizacion", "Puede marcar cotización como aceptada"),
         ]
 
+    def save(self, *args, **kwargs):
+        if not self.folio:
+            anio = (self.vigencia_desde.year if self.vigencia_desde else timezone.localdate().year)
+            self.folio = FolioCotizacionCounter.next_folio(anio)
+        super().save(*args, **kwargs)
 
 class CotizacionItem(TimeStampedModel, MoneyMixin):
     cotizacion = models.ForeignKey(Cotizacion, on_delete=models.CASCADE, related_name="items")

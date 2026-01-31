@@ -1,27 +1,35 @@
-from datetime import timedelta
-
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils import timezone
 from django.views.generic import TemplateView
 from ui.services.dashboard import agente_kpis
-from crm.models import Cliente
-from cotizador.models import Cotizacion
-from polizas.models import Poliza, Incidente, Siniestro
-from finanzas.models import Pago
-
+from django.shortcuts import redirect
 
 def user_in_group(user, group_name: str) -> bool:
     return user.is_authenticated and user.groups.filter(name=group_name).exists()
 
+def is_internal(user) -> bool:
+    return (
+        user.is_authenticated and (
+            user.is_superuser
+            or user_in_group(user, "Admin")
+            or user_in_group(user, "Supervisor")
+            or user_in_group(user, "Agente")
+        )
+    )
+
 class DashboardView(LoginRequiredMixin, TemplateView):
-    # template dinámico
+
+    def dispatch(self, request, *args, **kwargs):
+        if not is_internal(request.user):
+            # si es un cliente autenticado (o usuario sin rol interno), mándalo al portal
+            return redirect("portal:dashboard")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_template_names(self):
         u = self.request.user
         if u.is_superuser or user_in_group(u, "Admin"):
-            return ["ui/dashboard/admin.html"]   # luego lo creamos
+            return ["ui/dashboard/admin.html"]
         if user_in_group(u, "Supervisor"):
-            return ["ui/dashboard/supervisor.html"]  # luego lo creamos
+            return ["ui/dashboard/supervisor.html"]
         if user_in_group(u, "Agente"):
             return ["ui/dashboard/agente.html"]
         return ["ui/dashboard/basic.html"]
@@ -30,7 +38,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
 
-        # etiqueta rol (para navbar)
         if user.is_superuser or user_in_group(user, "Admin"):
             ctx["role_label"] = "Admin"
         elif user_in_group(user, "Supervisor"):
@@ -40,8 +47,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         else:
             ctx["role_label"] = "Lectura"
 
-        # KPIs Agente
-        if user_in_group(user, "Agente") or (not user_in_group(user, "Supervisor") and not user_in_group(user, "Admin") and not user.is_superuser):
+        # KPIs Agente solo para agente
+        if user_in_group(user, "Agente"):
             ctx["kpi"] = agente_kpis(user)
 
         return ctx
