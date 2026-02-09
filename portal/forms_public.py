@@ -5,6 +5,12 @@ from cotizador.models import Cotizacion
 from django import forms
 from crm.models import Cliente
 from autos.models import Marca, SubMarca, VehiculoCatalogo, Vehiculo
+from datetime import date
+
+def anios_choices(desde=2000, hasta=None):
+    if hasta is None:
+        hasta = date.today().year + 2
+    return [(y, y) for y in range(hasta, desde - 1, -1)]
 
 class CotizacionPublicaForm(forms.Form):
     # ===== Datos prospecto =====
@@ -38,11 +44,10 @@ class CotizacionPublicaForm(forms.Form):
         empty_label="Selecciona submarca",
         required=True,
     )
-
-    modelo_anio = forms.IntegerField(
-        widget=forms.NumberInput(attrs={"class": "form-control"}),
-        min_value=1950,
-        max_value=2100,
+    modelo_anio = forms.ChoiceField(
+        choices=[("", "Selecciona año")] + anios_choices(2000),
+        widget=forms.Select(attrs={"class": "form-select"}),
+        label="Año"
     )
 
     catalogo = forms.ModelChoiceField(

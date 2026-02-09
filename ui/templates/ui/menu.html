@@ -1,12 +1,16 @@
 <ul class="nav nav-pills flex-column gap-1">
   <li class="nav-item">
     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-       href="{% url 'ui:dashboard' %}">Dashboard</a>
+       href="{% url 'ui:dashboard' %}">Dashboard
+    </a>
   </li>
 
   {% if perms.crm.view_cliente %}
   <li class="nav-item">
-    <a class="nav-link" href="/admin/crm/cliente/">Clientes</a>
+    <a class="nav-link {% if 'cliente_' in request.resolver_match.url_name %}active{% endif %}"
+      href="{% url 'ui:cliente_list' %}">
+      Clientes
+    </a>
   </li>
   {% endif %}
 
@@ -18,16 +22,22 @@
 
   {% if perms.cotizador.view_cotizacion %}
   <li class="nav-item">
-    <a class="nav-link" href="{% url 'ui:cotizacion_list' %}">Cotizaciones</a>
+      <a class="nav-link {% if 'cotizacion_' in request.resolver_match.url_name %}active{% endif %}"
+        href="{% url 'ui:cotizacion_list' %}">
+        Cotizaciones
+      </a>
   </li>
   {% endif %}
-{% if perms.cotizador.view_cotizacion %}
 
-{% endif %}
-
-  {% if perms.polizas.view_poliza %}
+  {% if perms.polizas.manage_polizas %}
   <li class="nav-item">
-    <a class="nav-link" href="/admin/polizas/poliza/">Pólizas</a>
+    <a class="nav-link
+      {% if 'poliza_' in request.resolver_match.url_name %}
+        active
+      {% endif %}"
+      href="{% url 'ui:poliza_list' %}">
+      Pólizas
+    </a>
   </li>
   {% endif %}
 

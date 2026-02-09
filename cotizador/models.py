@@ -58,6 +58,12 @@ class Cotizacion(TimeStampedModel):
         RECHAZADA = "RECHAZADA", "Rechazada"
         VENCIDA = "VENCIDA", "Vencida"
 
+    class FormaPago(models.TextChoices):
+        CONTADO = "CONTADO", "Contado"
+        MENSUAL = "MENSUAL", "Mensual"
+        TRIMESTRAL = "TRIMESTRAL", "Trimestral"
+        SEMESTRAL = "SEMESTRAL", "Semestral"
+
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
     flotilla = models.ForeignKey(Flotilla, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
@@ -68,7 +74,12 @@ class Cotizacion(TimeStampedModel):
     vigencia_desde = models.DateField(db_index=True)
     vigencia_hasta = models.DateField(db_index=True)
 
-    forma_pago_preferida = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    forma_pago_preferida = models.CharField(
+        max_length=30,
+        choices=FormaPago.choices,
+        blank=True,
+        default=FormaPago.CONTADO,
+    )
     notas = models.TextField(blank=True, default="")
     estatus = models.CharField(max_length=10, choices=Estatus.choices, default=Estatus.BORRADOR, db_index=True)
 

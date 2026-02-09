@@ -1,0 +1,58 @@
+{% extends "ui/base.html" %}
+{% block title %}Nueva cotización{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="mb-3">Datos de la cotización</h4>
+
+        {% if form.errors %}
+          <div class="alert alert-danger py-2">
+            Revisa los campos marcados.
+          </div>
+        {% endif %}
+
+        <form method="post" class="row g-3">
+          {% csrf_token %}
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Vigencia desde
+              <small class="text-muted">(mm/dd/yyyy)</small>
+            </label>
+            {{ form.vigencia_desde }}
+            {% for e in form.vigencia_desde.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Vigencia hasta
+              <small class="text-muted">(mm/dd/yyyy)</small>
+            </label>
+            {{ form.vigencia_hasta }}
+            {% for e in form.vigencia_hasta.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Forma de pago preferida</label>
+            {{ form.forma_pago_preferida }}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Notas</label>
+            {{ form.notas }}
+          </div>
+
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{% url 'ui:cotizacion_new_vehiculo' %}">
+              Atrás
+            </a>
+            <button class="btn btn-primary" type="submit">Crear cotización</button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

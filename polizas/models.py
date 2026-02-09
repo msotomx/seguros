@@ -13,13 +13,25 @@ from cotizador.models import CotizacionItem
 # ---------------------------------------------------------------------
 # Pólizas / Endosos / Renovaciones
 # ---------------------------------------------------------------------
-
 class Poliza(TimeStampedModel, MoneyMixin):
     class Estatus(models.TextChoices):
         EN_PROCESO = "EN_PROCESO", "En proceso"
         VIGENTE = "VIGENTE", "Vigente"
         VENCIDA = "VENCIDA", "Vencida"
         CANCELADA = "CANCELADA", "Cancelada"
+
+    class MotivoCancelacion(models.TextChoices):
+            FALTA_PAGO = "FALTA_PAGO", "Falta de pago"
+            SOLICITUD_CLIENTE = "SOLICITUD_CLIENTE", "Solicitud del cliente"
+            ERROR_EMISION = "ERROR_EMISION", "Error en emisión"
+            CAMBIO_ASEGURADORA = "CAMBIO_ASEGURADORA", "Cambio de aseguradora"
+            OTRO = "OTRO", "Otro"
+
+    class FormaPago(models.TextChoices):
+        CONTADO = "CONTADO", "Contado"
+        MENSUAL = "MENSUAL", "Mensual"
+        TRIMESTRAL = "TRIMESTRAL", "Trimestral"
+        SEMESTRAL = "SEMESTRAL", "Semestral"
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="polizas")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
@@ -30,15 +42,25 @@ class Poliza(TimeStampedModel, MoneyMixin):
     cotizacion_item = models.ForeignKey(CotizacionItem, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
 
     numero_poliza = models.CharField(max_length=80, db_index=True)
+    fecha_emision = models.DateField(null=True,blank=True,db_index=True,
+                                     help_text="Fecha en que la póliza fue emitida")
     vigencia_desde = models.DateField(db_index=True)
     vigencia_hasta = models.DateField(db_index=True)
     estatus = models.CharField(max_length=12, choices=Estatus.choices, default=Estatus.EN_PROCESO, db_index=True)
 
     prima_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    forma_pago = models.CharField(max_length=30, blank=True, default="")
-
+    forma_pago = models.CharField(
+        max_length=30,
+        choices=FormaPago.choices,
+        blank=True,
+        default=FormaPago.CONTADO,
+    )
     agente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
     documento = models.ForeignKey(Documento, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
+    fecha_cancelacion = models.DateField(null=True, blank=True, db_index=True)
+    motivo_cancelacion = models.CharField(max_length=30, choices=MotivoCancelacion.choices, 
+                                          blank=True, default="",)
+    motivo_cancelacion_detalle = models.TextField(blank=True, default="")
 
     class Meta:
         constraints = [
@@ -51,6 +73,7 @@ class Poliza(TimeStampedModel, MoneyMixin):
         indexes = [
             models.Index(fields=["cliente", "estatus"]),
             models.Index(fields=["vigencia_hasta", "estatus"]),
+            models.Index(fields=["fecha_emision", "estatus"]),
         ]
         permissions = [
             ("manage_polizas", "Puede administrar pólizas"),
@@ -145,3 +168,27 @@ class Siniestro(TimeStampedModel):
             models.Index(fields=["aseguradora", "estatus"]),
             models.Index(fields=["fecha_reporte"]),
         ]
+
+class PolizaEvento(models.Model):
+
+    class Tipo(models.TextChoices):
+        CREADA = "CREADA", "Creada"
+        NUMERO_ACTUALIZADO = "NUMERO_ACTUALIZADO", "Número actualizado"
+        VIGENCIA_ACTUALIZADA = "VIGENCIA_ACTUALIZADA", "Vigencia actualizada"
+        MARCADA_VIGENTE = "MARCADA_VIGENTE", "Marcada como vigente"
+        CANCELADA = "CANCELADA", "Cancelada"
+        RENOVADA = "RENOVADA", "Renovada"
+
+    poliza = models.ForeignKey("polizas.Poliza", on_delete=models.CASCADE, related_name="eventos")
+    tipo = models.CharField(max_length=40, choices=Tipo.choices, db_index=True)
+    titulo = models.CharField(max_length=120, blank=True, default="")
+    detalle = models.TextField(blank=True, default="")
+    data = models.JSONField(blank=True, null=True)  # opcional (antes/después, etc.)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.poliza_id} {self.tipo} {self.created_at:%Y-%m-%d %H:%M}"

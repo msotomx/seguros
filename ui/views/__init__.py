@@ -11,6 +11,11 @@ from .cotizaciones import (
     CotizacionWizardClienteSelectView,
     CotizacionWizardTipoView,
     CotizacionWizardVehiculoSelectView,
+    cotizacion_calcular,
+    cotizacion_emitir,
+    cotizacion_emitir_poliza,
+    CotizacionWizardDatosView,
+    CotizacionItemDetailView,
 )
 from .clientes import (
     ClienteQuickCreateView, 
@@ -20,6 +25,11 @@ from .clientes import (
     ClienteUpdateView,
     ClienteDetailView,
 )
+
+from ui.views.polizas import PolizaListView, PolizaDetailView
+from ui.views.polizas import poliza_marcar_vigente, poliza_actualizar_numero, poliza_cancelar
+from ui.views.polizas import poliza_renovar, poliza_actualizar_vigencia
+from ui.views.pagos import PagoListView
 
 __all__ = [
     "DashboardView",
@@ -35,4 +45,17 @@ __all__ = [
     "ClienteCreateView",
     "ClienteUpdateView",
     "ClienteDetailView",
+    "cotizacion_calcular",
+    "cotizacion_emitir",
+    "cotizacion_emitir_poliza",
+    "PolizaListView",
+    "PolizaDetailView",
+    "CotizacionWizardDatosView",
+    "CotizacionItemDetailView",
+    "poliza_marcar_vigente",
+    "poliza_actualizar_numero",
+    "poliza_cancelar",
+    "poliza_renovar",
+    "poliza_actualizar_vigencia",
+    "PagoListView",
 ]

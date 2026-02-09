@@ -1,0 +1,30 @@
+/* Sidebar / Menu */
+.nav-item {
+  margin-bottom: 4px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #495057;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover {
+  background-color: #e9ecef;
+  color: #212529;
+}
+
+/* Activo */
+.nav-item.active > .nav-link {
+  background-color: #0d6efd; /* Bootstrap primary */
+  color: #ffffff;
+}
+
+.nav-item.active > .nav-link i {
+  color: #ffffff;
+}

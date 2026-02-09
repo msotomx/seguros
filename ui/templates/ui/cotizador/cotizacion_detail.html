@@ -1,4 +1,6 @@
 {% extends "ui/base.html" %}
+{% load humanize %}
+
 {% block title %}Cotización #{{ cotizacion.id }}{% endblock %}
 
 {% block content %}
@@ -35,65 +37,158 @@
     </div>
   </div>
 
-  <div class="col-12 col-lg-8">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="fw-semibold mb-2">Comparativo</div>
-        <div class="text-muted small mb-3">
-          Items ordenados por: seleccionado → ranking → prima total
+<div class="col-12 col-lg-8">
+  <div class="card shadow-sm">
+    <div class="card-body">
+
+      <!-- Header: título + botón Calcular -->
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div>
+          <div class="fw-semibold">Comparativo</div>
+
+          {% if messages %}
+            {% for message in messages %}
+              {% if message.tags == "error" %}
+                <div class="alert alert-danger d-flex align-items-start py-2 mb-3">
+                  <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                  <div class="small">
+                    {{ message }}
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          <div class="text-muted small">
+            Items ordenados por: seleccionado → ranking → prima total
+          </div>
         </div>
-
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>Selección</th>
-                <th>Aseguradora</th>
-                <th>Producto</th>
-                <th>Forma pago</th>
-                <th>Meses</th>
-                <th class="text-end">Prima total</th>
-                <th class="text-end">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for it in items %}
-                <tr class="{% if it.seleccionada %}table-success{% endif %}">
-                  <td>
-                    {% if it.seleccionada %}
-                      <span class="badge bg-success">Seleccionada</span>
-                    {% else %}
-                      <span class="text-muted">—</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ it.aseguradora.nombre }}</td>
-                  <td>{{ it.producto.nombre_producto }}</td>
-                  <td>{{ it.forma_pago|default:"-" }}</td>
-                  <td>{{ it.meses|default:"-" }}</td>
-                  <td class="text-end fw-semibold">{{ it.prima_total }}</td>
-                  <td class="text-end">
-                    <div class="d-flex justify-content-end gap-2">
-                      <a class="btn btn-sm btn-outline-dark"
-                         href="/admin/cotizador/cotizacionitem/{{ it.id }}/change/">Ver item</a>
-
-                      {% if can_select %}
-                        <a class="btn btn-sm btn-primary"
-                           href="{% url 'ui:cotizacion_select_item' pk=cotizacion.id item_id=it.id %}">
-                          Seleccionar
-                        </a>
-                      {% endif %}
-                    </div>
-                  </td>
-                </tr>
-              {% empty %}
-                <tr><td colspan="7" class="text-center text-muted py-4">Esta cotización no tiene items aún.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
+        {% if can_calcular %}
+          <form method="post" action="{% url 'ui:cotizacion_calcular' pk=cotizacion.id %}" class="d-inline">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-primary" type="submit">
+              Calcular opciones
+            </button>
+          </form>
+        {% else %}
+          <button class="btn btn-sm btn-outline-secondary" type="button" disabled>
+            Calcular opciones
+          </button>
+        {% endif %}
       </div>
+      <!-- 1) este if  se agrego *** -->
+      {% if selected_item %}
+        <div class="alert alert-success d-flex align-items-center justify-content-between py-2 mb-3">
+          <div class="small">
+            <strong>Opción seleccionada:</strong>
+            {{ selected_item.aseguradora.nombre }} –
+            {{ selected_item.producto.nombre_producto }}
+            · Total <span class="fw-semibold">${{ selected_item.prima_total|floatformat:2|intcomma }}</span>
+          </div>
+
+          <a class="btn btn-sm btn-outline-dark"
+            href="{% url 'ui:cotizacion_item_detail' pk=selected_item.id %}">
+            Ver detalle
+          </a>
+        </div>
+      {% endif %}      
+
+      <div class="table-responsive">
+        <div class="small">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Selección</th>
+              <th>Aseguradora</th>
+              <th>Producto</th>
+              <th>Forma pago</th>
+              <th>Meses</th>
+              <th class="text-end">Prima total</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+              <tr class="{% if it.seleccionada %}table-success{% endif %}">
+                <td>
+                  {% if it.seleccionada %}
+                    <span class="badge bg-success">Seleccionada</span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ it.aseguradora.nombre }}</td>
+                <td>{{ it.producto.nombre_producto }}</td>
+                <td>{{ it.forma_pago|default:"-" }}</td>
+                <td>{{ it.meses|default:"-" }}</td>
+                <td class="text-end fw-semibold">
+                   ${{ it.prima_total|floatformat:2|intcomma }}
+                </td>
+
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+
+                    <a class="btn btn-sm btn-outline-dark"
+                      href="{% url 'ui:cotizacion_item_detail' pk=it.id %}">
+                      Ver item
+                    </a>
+                    <!-- 2) se agrego  ***-->  
+                    {% if can_select %}
+                      {% if it.seleccionada %}
+                        <span class="badge bg-success align-self-center">Seleccionada</span>
+                      {% else %}
+                        {% if selected_item %}
+                          <button class="btn btn-sm btn-outline-secondary" type="button" disabled>
+                            Seleccionar
+                          </button>
+                        {% else %}
+                          <a class="btn btn-sm btn-primary"
+                            href="{% url 'ui:cotizacion_select_item' pk=cotizacion.id item_id=it.id %}">
+                            Seleccionar
+                          </a>
+                        {% endif %}
+                      {% endif %}
+                    {% endif %}
+
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                  Esta cotización no tiene items aún.
+                  <div class="small mt-1">Usa <span class="fw-semibold">Calcular opciones</span> para generarlos.</div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        
+        </table>
+        </div>  <!-- este se class="small"-->
+      </div>
+
+      <!-- Footer: botón Emitir -->
+      <div class="d-flex justify-content-end mt-3">
+        {% if can_emitir %}
+          <form method="post" action="{% url 'ui:cotizacion_emitir_poliza' pk=cotizacion.id %}" class="d-inline">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-success"
+                    onclick="return confirm('¿Emitir póliza con la opción seleccionada?');"
+                    type="submit">
+              Emitir póliza
+            </button>
+          </form>
+        {% else %}
+          <button class="btn btn-sm btn-outline-success" type="button" disabled>
+            Emitir póliza
+          </button>
+        {% endif %}
+      </div>
+
     </div>
   </div>
 </div>
+</div>
+
 {% endblock %}

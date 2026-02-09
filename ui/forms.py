@@ -1,19 +1,44 @@
 from django import forms
 from django.db.models import Q
 from django.views.generic import TemplateView
+from django.utils import timezone
 
+from .forms_mixins import BootstrapFormMixin
 from autos.models import Vehiculo, VehiculoCatalogo
 from crm.models import Cliente
-from .forms_mixins import BootstrapFormMixin
+from cotizador.models import Cotizacion
 
-class VehiculoFromCatalogoForm(BootstrapFormMixin, forms.ModelForm):
+
+class VehiculoFromCatalogoForm(forms.ModelForm):
+    """
+    Form mínimo para crear un Vehiculo a partir del catálogo
+    durante el wizard de cotización.
+    """
+
+    # Campo auxiliar (no es FK directa en Vehiculo)
+    catalogo_id = forms.ModelChoiceField(
+        queryset=VehiculoCatalogo.objects.filter(is_active=True),
+        label="Versión",
+        required=True,
+    )
+
+    class Meta:
+        model = Vehiculo   # 🔴 ESTA LÍNEA ES LA CLAVE
+        fields = [
+            "tipo_uso",
+            "placas",
+            "vin",
+            "color",
+            "valor_comercial",
+        ]
+
+class VehiculoFromCatalogoForm2(BootstrapFormMixin, forms.ModelForm):
     catalogo_id = forms.IntegerField()
     tipo_uso = forms.ChoiceField(choices=Vehiculo.TipoUso.choices)
     placas = forms.CharField(required=False, max_length=20)
     vin = forms.CharField(required=False, max_length=40)
     color = forms.CharField(required=False, max_length=40)
     valor_comercial = forms.DecimalField(required=False, max_digits=14, decimal_places=2)
-
 
 class ClienteQuickCreateForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
@@ -133,3 +158,53 @@ class ClienteForm(forms.ModelForm):
             self.add_error("tipo_cliente", "Selecciona el tipo de cliente.")
 
         return cleaned
+
+from datetime import timedelta
+
+class CotizacionDatosForm(forms.ModelForm):
+    class Meta:
+        model = Cotizacion
+        fields = ["vigencia_desde", "vigencia_hasta", "forma_pago_preferida", "notas"]
+
+        widgets = {
+            "vigencia_desde": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "vigencia_hasta": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+#            "vigencia_desde": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+#            "vigencia_hasta": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "forma_pago_preferida": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Contado / Mensual"}),
+            "notas": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["vigencia_desde"].input_formats = ["%Y-%m-%d"]
+        self.fields["vigencia_hasta"].input_formats = ["%Y-%m-%d"]
+        # Solo en GET (no bound) y solo si vienen vacías en la instancia
+        if not self.is_bound:
+            today = timezone.localdate()
+
+            if not self.instance.vigencia_desde:
+                self.initial.setdefault("vigencia_desde", today)
+
+            if not self.instance.vigencia_hasta:
+                self.initial.setdefault("vigencia_hasta", today + timedelta(days=365))
+
+            if not (self.instance.forma_pago_preferida or "").strip():
+                self.initial.setdefault("forma_pago_preferida", "CONTADO")
+    
+    def clean(self):
+        cleaned = super().clean()
+        d = cleaned.get("vigencia_desde")
+        h = cleaned.get("vigencia_hasta")
+        if d and h and h <= d:
+            self.add_error("vigencia_hasta", "La vigencia hasta debe ser mayor a la vigencia desde.")
+        return cleaned
+
+    @staticmethod
+    def initial_defaults():
+        today = timezone.localdate()
+        return {
+            "vigencia_desde": today,
+            "vigencia_hasta": today + timedelta(days=365),
+            "forma_pago_preferida": "CONTADO",
+        }

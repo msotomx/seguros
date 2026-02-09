@@ -1,7 +1,12 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
-from ui.services.dashboard import agente_kpis
 from django.shortcuts import redirect
+from django.utils.timezone import localdate
+from datetime import timedelta
+
+from ui.services.dashboard import agente_kpis
+from cotizador.models import Cotizacion
+from polizas.models import Poliza
 
 def user_in_group(user, group_name: str) -> bool:
     return user.is_authenticated and user.groups.filter(name=group_name).exists()
@@ -48,7 +53,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ctx["role_label"] = "Lectura"
 
         # KPIs Agente solo para agente
-        if user_in_group(user, "Agente"):
-            ctx["kpi"] = agente_kpis(user)
+        ctx["kpi"] = agente_kpis(user)
 
         return ctx
+

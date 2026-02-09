@@ -1,0 +1,176 @@
+{% extends "portal/base.html" %}
+{% block title %}Cotizar{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-body">
+        <h1 class="h4 mb-3">Cotiza tu seguro</h1>
+        {% if form.errors %}
+          <div class="alert alert-danger">
+            <strong>Revisa el formulario:</strong>
+            {{ form.errors }}
+          </div>
+        {% endif %}
+
+        {{ form.non_field_errors }}
+
+        <form method="post" class="row g-3">
+
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Tipo de cliente</label>
+            {{ form.tipo_cliente }}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Email</label>
+            {{ form.email }}
+          </div>
+
+          <div class="col-12 col-md-6">
+            <label class="form-label">Teléfono</label>
+            {{ form.telefono }}
+          </div>
+
+          <div class="col-12">
+            <hr class="my-2">
+            <h2 class="h6 mb-2">Datos del cliente</h2>
+          </div>
+
+          <div class="col-12 col-md-4">
+            <label class="form-label">Nombre</label>
+            {{ form.nombre }}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Apellido paterno</label>
+            {{ form.apellido_paterno }}
+          </div>
+          <div class="col-12 col-md-4">
+            <label class="form-label">Apellido materno</label>
+            {{ form.apellido_materno }}
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Nombre comercial (si es empresa)</label>
+            {{ form.nombre_comercial }}
+          </div>
+
+          <hr class="my-3">
+            <h2 class="h6 mb-2">Vehículo</h2>
+
+            <div class="row g-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label">Tipo de uso</label>
+                {{ form.tipo_uso }}
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label">Año</label>
+                {{ form.modelo_anio }}
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label">Marca</label>
+                    {{ form.marca }}
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label">Submarca</label>
+                    {{ form.submarca }}
+                </div>
+
+                <div class="col-12 col-md-8">
+                    <label class="form-label">Versión</label>
+                    {{ form.catalogo }}
+                </div>
+            </div>
+
+            <div class="col-12 col-md-4">
+                <label class="form-label">Placas</label>
+                {{ form.placas }}
+            </div>
+
+            <div class="col-12">
+                <label class="form-label">VIN (opcional)</label>
+                {{ form.vin }}
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notas</label>
+              {{ form.notas }}
+            </div>
+
+          <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-primary" type="submit">Solicitar cotización</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const marcaEl = document.getElementById("id_marca");
+  const submarcaEl = document.getElementById("id_submarca");
+  const anioEl = document.getElementById("id_modelo_anio");
+  const catalogoEl = document.getElementById("id_catalogo");
+
+  function resetSelect(selectEl, placeholder) {
+    selectEl.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = placeholder;
+    selectEl.appendChild(opt);
+  }
+
+  async function cargarSubmarcas() {
+    resetSelect(submarcaEl, "Selecciona submarca");
+    resetSelect(catalogoEl, "Selecciona versión");
+
+    if (!marcaEl.value) return;
+
+    const resp = await fetch("{% url 'portal:api_submarcas' %}?marca_id=" + marcaEl.value);
+    const data = await resp.json();
+
+    for (const item of data.results) {
+      const opt = document.createElement("option");
+      opt.value = item.id;
+      opt.textContent = item.nombre;
+      submarcaEl.appendChild(opt);
+    }
+  }
+
+  async function cargarCatalogo() {
+    resetSelect(catalogoEl, "Selecciona versión");
+
+    if (!marcaEl.value || !submarcaEl.value || !anioEl.value) return;
+
+    const url = "{% url 'portal:api_catalogo' %}"
+      + "?marca_id=" + marcaEl.value
+      + "&submarca_id=" + submarcaEl.value
+      + "&anio=" + anioEl.value;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    for (const item of data.results) {
+      const opt = document.createElement("option");
+      opt.value = item.id;
+      opt.textContent = item.label;
+      catalogoEl.appendChild(opt);
+    }
+  }
+
+  marcaEl?.addEventListener("change", cargarSubmarcas);
+  submarcaEl?.addEventListener("change", cargarCatalogo);
+  anioEl?.addEventListener("change", cargarCatalogo);
+
+  // inicializa
+  resetSelect(submarcaEl, "Selecciona submarca");
+  resetSelect(catalogoEl, "Selecciona versión");
+</script>
+
+{% endblock %}

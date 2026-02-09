@@ -7,6 +7,7 @@ from django.utils import timezone
 from cotizador.models import Cotizacion
 from polizas.models import Poliza
 from finanzas.models import Pago, Comision
+from datetime import timedelta
 
 
 def month_range(today: date | None = None):
@@ -49,6 +50,13 @@ def agente_kpis(user):
         vigencia_desde__lte=today,
         vigencia_hasta__gte=today,
     )
+
+    in_30 = today + timedelta(days=30)
+    pol_por_vencer = polizas.filter(
+        estatus=Poliza.Estatus.VIGENTE,
+        vigencia_hasta__gte=today,
+        vigencia_hasta__lte=in_30,
+    ).order_by("vigencia_hasta")
 
     # Pólizas emitidas este mes (para conversión)
     pol_mes = polizas.filter(created_at__date__gte=start_m, created_at__date__lt=end_m)
@@ -95,6 +103,7 @@ def agente_kpis(user):
             "cot_mes": cot_mes_count,
             "cot_pendientes": cot_pendientes.count(),
             "pol_vigentes": pol_vigentes.count(),
+            "pol_por_vencer": pol_por_vencer.count(),
             "pagos_vencidos": pagos_vencidos.count(),
         },
         "money": {
@@ -105,6 +114,7 @@ def agente_kpis(user):
         },
         "lists": {
             "ult_cot": ult_cot,
+            "pol_por_vencer": pol_por_vencer.select_related("cliente", "aseguradora")[:8],
         },
         "breakdown": breakdown_map,
     }

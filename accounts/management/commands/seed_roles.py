@@ -45,6 +45,25 @@ class Command(BaseCommand):
                 "polizas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "finanzas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
             },
+            # Supervisor: Es el Gerente que tiene a su cargos Agentes
+            #             Opera Cuentas-usuarios, Documentos, CRM, Autos, Cotizaciones y Pólizas.
+            # - Catalogos: Solo ver
+            # - Documentos: add, change y ver 
+            # - Autos: add, change y ver 
+            # - Finanzas: solo ver
+            # - Tarifas: NO
+            "Supervisor": {
+                "accounts": AppPolicy(actions={"add", "change","view"}),
+                "documentos": AppPolicy(actions={"add", "change", "view"}),  # adjuntar archivos
+                "catalogos": AppPolicy(actions={"view"}),  # ver aseguradoras/productos/coberturas
+                "crm": AppPolicy(actions={"add", "change", "delete","view"}, include_manage=False),
+                "autos": AppPolicy(actions={"add", "change", "view"}),
+                "cotizador": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
+                "polizas": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
+                "finanzas": AppPolicy(actions={"view"}),
+                # "tarifas": (no incluido)
+            },
+
 
             # Agente: opera CRM, Autos, Cotizaciones y Pólizas.
             # - Catálogos: puede ver (y opcionalmente editar si deseas)
