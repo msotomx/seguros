@@ -43,7 +43,13 @@
 
   {% if perms.finanzas.view_pago %}
   <li class="nav-item">
-    <a class="nav-link" href="/admin/finanzas/pago/">Pagos</a>
+    <a class="nav-link
+      {% if 'pago_' in request.resolver_match.url_name %}
+        active
+      {% endif %}"
+      href="{% url 'ui:pago_list' %}">
+      Pagos
+    </a>
   </li>
   {% endif %}
 

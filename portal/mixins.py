@@ -5,7 +5,6 @@ from django.shortcuts import redirect
 
 
 class ClientePortalRequiredMixin(LoginRequiredMixin):
-    login_url = "login"  # o "/accounts/login/"
 
     @property
     def cliente(self):
@@ -21,7 +20,7 @@ class ClientePortalRequiredMixin(LoginRequiredMixin):
             cliente = request.user.cliente_portal
         except Exception:
             messages.error(request, "Tu usuario no está ligado a un cliente del portal.")
-            return redirect(self.login_url)
+            return redirect('accounts/login')
 
         # Portal activo
         if not cliente.portal_activo:

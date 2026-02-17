@@ -18,7 +18,6 @@ from .views import (
     ClienteUpdateView,
     ClienteDetailView,
     cotizacion_calcular,
-    cotizacion_emitir,
     cotizacion_emitir_poliza,
     PolizaListView,
     PolizaDetailView,
@@ -29,7 +28,12 @@ from .views import (
     poliza_cancelar,
     poliza_renovar,
     poliza_actualizar_vigencia,
-    PagoListView,
+    PagoListView, 
+    pago_marcar_pagado,
+    ComisionListView,
+    comision_marcar_pagada,
+    poliza_documento_subir,
+    pago_comprobante_subir,
 )
 
 app_name = "ui"
@@ -57,7 +61,6 @@ urlpatterns = [
     path("cotizaciones/item/<int:pk>/", CotizacionItemDetailView.as_view(), name="cotizacion_item_detail"),
     # Calcular cotizaciones
     path("cotizaciones/<int:pk>/calcular/", cotizacion_calcular, name="cotizacion_calcular"),
-    #path("cotizaciones/<int:pk>/emitir/", cotizacion_emitir, name="cotizacion_emitir"),
     path("cotizaciones/<int:pk>/emitir/", cotizacion_emitir_poliza, name="cotizacion_emitir_poliza"),
     # cambia el portal_activo del cliente
     path("clientes/<int:pk>/portal-toggle/", cliente_portal_toggle, name="cliente_portal_toggle"),
@@ -76,4 +79,13 @@ urlpatterns = [
     path("polizas/<int:pk>/actualizar-vigencia/", poliza_actualizar_vigencia, name="poliza_actualizar_vigencia"),
     # Pagos
     path("pagos/", PagoListView.as_view(), name="pago_list"),
+    path("pagos/<int:pk>/marcar-pagado/", pago_marcar_pagado, name="pago_marcar_pagado"),
+    # Comisiones
+    path("comisiones/", ComisionListView.as_view(), name="comision_list"),
+    path("comisiones/<int:pk>/marcar-pagada/", comision_marcar_pagada, name="comision_marcar_pagada"),
+    # Documentos
+    path("polizas/<int:pk>/documento/subir/", poliza_documento_subir, name="poliza_documento_subir"),
+    path("pagos/<int:pk>/comprobante/subir/", pago_comprobante_subir, name="pago_comprobante_subir"),
+
+
 ]

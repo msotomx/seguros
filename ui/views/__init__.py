@@ -12,7 +12,6 @@ from .cotizaciones import (
     CotizacionWizardTipoView,
     CotizacionWizardVehiculoSelectView,
     cotizacion_calcular,
-    cotizacion_emitir,
     cotizacion_emitir_poliza,
     CotizacionWizardDatosView,
     CotizacionItemDetailView,
@@ -28,8 +27,9 @@ from .clientes import (
 
 from ui.views.polizas import PolizaListView, PolizaDetailView
 from ui.views.polizas import poliza_marcar_vigente, poliza_actualizar_numero, poliza_cancelar
-from ui.views.polizas import poliza_renovar, poliza_actualizar_vigencia
-from ui.views.pagos import PagoListView
+from ui.views.polizas import poliza_renovar, poliza_actualizar_vigencia, poliza_documento_subir
+from ui.views.pagos import PagoListView, pago_marcar_pagado, pago_comprobante_subir
+from ui.views.comisiones import ComisionListView, comision_marcar_pagada
 
 __all__ = [
     "DashboardView",
@@ -46,7 +46,6 @@ __all__ = [
     "ClienteUpdateView",
     "ClienteDetailView",
     "cotizacion_calcular",
-    "cotizacion_emitir",
     "cotizacion_emitir_poliza",
     "PolizaListView",
     "PolizaDetailView",
@@ -57,5 +56,10 @@ __all__ = [
     "poliza_cancelar",
     "poliza_renovar",
     "poliza_actualizar_vigencia",
+    "poliza_documento_subir",
     "PagoListView",
+    "pago_marcar_pagado",
+    "pago_comprobante_subir",
+    "ComisionListView",
+    "comision_marcar_pagada",
 ]

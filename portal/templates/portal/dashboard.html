@@ -11,7 +11,7 @@
       <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
           <h1 class="h4 mb-1">
-            {{ cliente.nombre_comercial|default:cliente.nombre|default:"Cliente" }}
+            {{ cliente.nombre_mostrar|default:"Cliente" }}
           </h1>
           <div class="text-muted small">
             RFC: {{ cliente.rfc|default:"—" }} ·
@@ -47,11 +47,12 @@
     <div class="card">
       <div class="card-body">
         <div class="text-muted small">Recibos pendientes</div>
-        <div class="display-6">—</div>
-        <div class="text-muted small">Próximamente</div>
+        <div class="display-6">{{ pagos_pendientes_count }}</div>
+        <div class="text-muted small">Pendientes o vencidos</div>
       </div>
     </div>
   </div>
+
 
   <!-- Cotizaciones activas -->
   <div class="col-12 col-lg-6">
@@ -107,6 +108,7 @@
                   <th># Póliza</th>
                   <th>Aseguradora</th>
                   <th class="text-end">Vence</th>
+                  <th class="text-end">Documento</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,9 +117,20 @@
                   <td>{{ p.numero_poliza }}</td>
                   <td>{{ p.aseguradora.nombre }}</td>
                   <td class="text-end">{{ p.vigencia_hasta|date:"d/M/Y" }}</td>
+                  <td class="text-end">
+                    {% if p.documento_id %}
+                      <a class="btn btn-sm btn-outline-primary"
+                        href="{% url 'documentos:download' p.documento_id %}">
+                        <i class="bi bi-download me-1"></i> PDF
+                      </a>
+                    {% else %}
+                      <span class="text-muted small">Pendiente</span>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
+
             </table>
           </div>
         {% else %}
@@ -127,5 +140,103 @@
     </div>
   </div>
 
+  <!-- Pagos Pendientes-->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Pagos pendientes</strong>
+        <span class="badge text-bg-warning">{{ pagos_pendientes_count }}</span>
+      </div>
+
+      <div class="card-body p-0">
+        {% if pagos_pendientes %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Póliza</th>
+                  <th>Aseguradora</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-end">Estatus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in pagos_pendientes %}
+                <tr>
+                  <td>{{ p.fecha_programada|date:"d/M/Y" }}</td>
+                  <td class="fw-semibold">{{ p.poliza.numero_poliza|truncatechars:18 }}</td>
+                  <td>{{ p.poliza.aseguradora.nombre }}</td>
+                  <td class="text-end">${{ p.monto|floatformat:2 }}</td>
+                  <td class="text-end">
+                    {% if p.estatus == "VENCIDO" %}
+                      <span class="badge text-bg-danger">Vencido</span>
+                    {% else %}
+                      <span class="badge text-bg-warning">Pendiente</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">No tienes pagos pendientes.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagos Pagados -->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <strong>Pagos recientes</strong>
+        <span class="badge text-bg-success">Pagados</span>
+      </div>
+
+      <div class="card-body p-0">
+        {% if pagos_pagados %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Póliza</th>
+                  <th class="text-end">Monto</th>
+                  <th class="text-end">Comprobante</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in pagos_pagados %}
+                <tr>
+                  <td>{{ p.fecha_pago|date:"d/M/Y"|default:"—" }}</td>
+                  <td class="fw-semibold">{{ p.poliza.numero_poliza|truncatechars:18 }}</td>
+                  <td class="text-end">${{ p.monto|floatformat:2 }}</td>
+                  <td class="text-end">
+                    {% if p.comprobante_id %}
+                      <a class="btn btn-sm btn-outline-primary py-0 px-2"
+                        style="font-size:.75rem;"
+                        href="{% url 'documentos:download' p.comprobante_id %}">
+                        <i class="bi bi-paperclip me-1"></i> Ver
+                      </a>
+                    {% else %}
+                      <span class="text-muted small">—</span>
+                    {% endif %}
+
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-3 text-muted">Aún no hay pagos registrados como pagados.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  
 </div>
 {% endblock %}

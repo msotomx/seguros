@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Set, Dict
 
 from django.core.management.base import BaseCommand
@@ -11,18 +11,17 @@ from django.contrib.auth.models import Group, Permission
 from django.db import transaction
 from django.db.models import Q
 
-
-
 @dataclass(frozen=True)
 class AppPolicy:
     """
     Política de permisos por app.
     actions: conjunto de {"add","change","delete","view"}.
     include_manage: incluye permisos custom codename que empiecen con "manage_".
+    extra_codenames: permisos extra (codenames exactos) dentro del app_label.
     """
     actions: Set[str]
     include_manage: bool = False
-
+    extra_codenames: Set[str] = field(default_factory=set)
 
 class Command(BaseCommand):
     help = "Crea/actualiza grupos y permisos base (Admin, Agente, Operador, Lectura) con políticas por app."
@@ -36,7 +35,6 @@ class Command(BaseCommand):
             # Admin: TODO en todas las apps + todos los manage_*
             "Admin": {
                 "accounts": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
-                "documentos": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "catalogos": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "crm": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "autos": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
@@ -44,26 +42,33 @@ class Command(BaseCommand):
                 "cotizador": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "finanzas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
+                "documentos": AppPolicy(
+                    actions={"add", "change", "delete", "view"},
+                    extra_codenames={"download_documento"},
+                ),
+
             },
             # Supervisor: Es el Gerente que tiene a su cargos Agentes
             #             Opera Cuentas-usuarios, Documentos, CRM, Autos, Cotizaciones y Pólizas.
-            # - Catalogos: Solo ver
+            # - Accounts: puede dar altas cambios de agentes 
+            # - Catalogos: solo ver
             # - Documentos: add, change y ver 
             # - Autos: add, change y ver 
-            # - Finanzas: solo ver
+            # - Finanzas: marcar pago -pagado, marcar comision pagada
             # - Tarifas: NO
             "Supervisor": {
-                "accounts": AppPolicy(actions={"add", "change","view"}),
-                "documentos": AppPolicy(actions={"add", "change", "view"}),  # adjuntar archivos
-                "catalogos": AppPolicy(actions={"view"}),  # ver aseguradoras/productos/coberturas
-                "crm": AppPolicy(actions={"add", "change", "delete","view"}, include_manage=False),
+                "accounts": AppPolicy(actions={"add", "change", "view"}),  # sí administra agentes
+                "catalogos": AppPolicy(actions={"view"}),
+                "crm": AppPolicy(actions={"add", "change", "view"}, include_manage=False),  # sin delete
                 "autos": AppPolicy(actions={"add", "change", "view"}),
                 "cotizador": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
-                "finanzas": AppPolicy(actions={"view"}),
-                # "tarifas": (no incluido)
+                "finanzas": AppPolicy(actions={"add","view", "change"}, include_manage=True),
+                "documentos": AppPolicy(
+                    actions={"add", "change", "view"},
+                    extra_codenames={"download_documento"},
+                ),
             },
-
 
             # Agente: opera CRM, Autos, Cotizaciones y Pólizas.
             # - Catálogos: puede ver (y opcionalmente editar si deseas)
@@ -71,13 +76,17 @@ class Command(BaseCommand):
             # - Tarifas: NO
             "Agente": {
                 "accounts": AppPolicy(actions={"view"}),  # ver usuarios (opcional)
-                "documentos": AppPolicy(actions={"add", "change", "view"}),  # adjuntar archivos
                 "catalogos": AppPolicy(actions={"view"}),  # ver aseguradoras/productos/coberturas
                 "crm": AppPolicy(actions={"add", "change", "view"}, include_manage=False),
                 "autos": AppPolicy(actions={"add", "change", "view"}),
                 "cotizador": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
                 "finanzas": AppPolicy(actions={"view"}),  # solo consulta
+                "documentos": AppPolicy(
+                    actions={"add", "view"},
+                    extra_codenames={"download_documento"},
+                ),
+
                 # "tarifas": (no incluido)
             },
 
@@ -109,6 +118,13 @@ class Command(BaseCommand):
                 "polizas": AppPolicy(actions={"view"}),
                 "finanzas": AppPolicy(actions={"view"}),
             },
+            "Portal": {
+                "documentos": AppPolicy(
+                    actions={"view"},
+                    extra_codenames={"download_documento"},
+                ),
+            },
+
         }
 
         # ------------------------------------------------------------------
@@ -148,6 +164,10 @@ class Command(BaseCommand):
             if policy.include_manage:
                 manage_qs = base_qs.filter(codename__startswith="manage_")
                 perm_ids.update(manage_qs.values_list("id", flat=True))
+
+            if policy.extra_codenames:
+                extra_qs = base_qs.filter(codename__in=policy.extra_codenames)
+                perm_ids.update(extra_qs.values_list("id", flat=True))
 
         return Permission.objects.filter(id__in=perm_ids)
 

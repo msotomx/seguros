@@ -1,0 +1,101 @@
+{% extends "ui/base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Comisiones</h4>
+  <a class="btn btn-outline-secondary" href="{% url 'ui:dashboard' %}">
+    <i class="bi bi-arrow-left me-1"></i> Dashboard
+  </a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-12 col-md-6">
+        <label class="form-label">Buscar</label>
+        <input name="q" value="{{ filters.q }}" class="form-control" placeholder="Póliza, cliente o agente">
+      </div>
+
+      <div class="col-12 col-md-3">
+        <label class="form-label">Estatus</label>
+        <select name="estatus" class="form-select">
+          <option value="">Todos</option>
+          {% for val, label in estatus_choices %}
+            <option value="{{ val }}" {% if filters.estatus == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12 col-md-3 d-grid">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-funnel me-1"></i> Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Creada</th>
+            <th>Póliza</th>
+            <th>Cliente</th>
+            <th>Agente</th>
+            <th class="text-end">%</th>
+            <th class="text-end">Monto</th>
+            <th>Estatus</th>
+            <th class="text-end">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in comisiones %}
+            <tr>
+              <td class="text-nowrap">{{ c.created_at|date:"d/M/Y" }}</td>
+              <td class="text-nowrap">
+                <a href="{% url 'ui:poliza_detail' c.poliza_id %}" class="text-decoration-none">
+                  {{ c.poliza.numero_poliza }}
+                </a>
+              </td>
+              <td>{{ c.poliza.cliente }}</td>
+              <td class="text-nowrap">{{ c.agente }}</td>
+              <td class="text-end">{{ c.porcentaje|floatformat:2 }}</td>
+              <td class="text-end">${{ c.monto|floatformat:2 }}</td>
+              <td>
+                {% if c.estatus == "PENDIENTE" %}
+                  <span class="badge bg-warning text-dark">Pendiente</span>
+                {% else %}
+                  <span class="badge bg-success">Pagada</span>
+                {% endif %}
+              </td>
+                <td class="text-end align-middle">
+                    {% if c.estatus == "PENDIENTE" %}
+                        <form method="post" action="{% url 'ui:comision_marcar_pagada' c.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-outline-success" type="submit">
+                            <i class="bi bi-check2-circle me-1"></i> Marcar pagada
+                        </button>
+                        </form>
+                    {% else %}
+                        <span class="badge bg-success-subtle text-success" style="font-size:0.7rem;">
+                        Pagada {{ c.fecha_pago|date:"d/M/Y" }}
+                        </span>
+                    {% endif %}
+                </td>
+
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">No hay comisiones.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

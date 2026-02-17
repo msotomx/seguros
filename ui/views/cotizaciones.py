@@ -1,5 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.decorators import login_required, permission_required
+from django.views.decorators.http import require_POST
 from django.db.models import Q
 from django.views.generic import ListView, CreateView, DetailView
 from django.contrib import messages
@@ -73,7 +74,6 @@ class CotizacionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             "q": self.request.GET.get("q", ""),
         }
         return ctx
-
 
 class CotizacionDetailView(DetailView):
     model = Cotizacion
@@ -162,10 +162,41 @@ class CotizacionItemDetailView(LoginRequiredMixin, DetailView):
 
         return ctx
 
+# Seleccionar Opcion previo a emitir poliza
+@login_required
+@permission_required("cotizador.change_cotizacionitem", raise_exception=True)
+@require_POST
+def cotizacion_select_item(request, pk: int, item_id: int):
+    cot = get_object_or_404(Cotizacion, pk=pk)
+
+    # Permisos / alcance
+    is_admin = request.user.is_superuser or request.user.groups.filter(name="Admin").exists()
+    if not is_admin and cot.owner_id != request.user.id:
+        return HttpResponseForbidden("No autorizado para modificar esta cotización.")
+
+    # Estatus permitido
+    if cot.estatus not in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA]:
+        messages.warning(request, "Esta cotización ya no permite cambiar de opción.")
+        return redirect("ui:cotizacion_detail", pk=cot.pk)
+
+    item = get_object_or_404(CotizacionItem, pk=item_id, cotizacion=cot)
+
+    with transaction.atomic():
+        # des-selecciona todos
+        cot.items.filter(seleccionada=True).exclude(pk=item.pk).update(seleccionada=False)
+        # selecciona el nuevo
+        if not item.seleccionada:
+            item.seleccionada = True
+            item.save(update_fields=["seleccionada"])
+
+    messages.success(request, f"Seleccionaste: {item.aseguradora.nombre} - {item.producto.nombre_producto}")
+    return redirect("ui:cotizacion_detail", pk=cot.pk)
+
+
 
 @login_required
 @permission_required("cotizador.change_cotizacionitem", raise_exception=True)
-def cotizacion_select_item(request, pk: int, item_id: int):
+def cotizacion_select_item2(request, pk: int, item_id: int):
     """
     Marca un item como seleccionado y desmarca los demás.
     """
@@ -184,15 +215,6 @@ def cotizacion_select_item(request, pk: int, item_id: int):
 
     messages.success(request, f"Seleccionaste: {item.aseguradora.nombre} - {item.producto.nombre_producto}")
     return redirect(reverse("ui:cotizacion_detail", kwargs={"pk": cotizacion.pk}))
-
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Q
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.views.generic import ListView
-from crm.models import Cliente
-
 
 class CotizacionWizardClienteSelectView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """
@@ -484,6 +506,15 @@ def cotizacion_calcular(request, pk: int):
         cot.items.all().delete()
 
         seen = set()  # para evitar duplicados (aseguradora_id, producto_id)
+        MESES_MAP = {
+            "CONTADO": 1,
+            "MENSUAL": 12,
+            "TRIMESTRAL": 4,
+            "SEMESTRAL": 2,
+        }
+
+        forma = cot.forma_pago_preferida or "CONTADO"
+        meses = MESES_MAP.get(forma, 1)
 
         for r in results:
             key = (int(r.aseguradora_id), int(r.producto_id))
@@ -501,8 +532,8 @@ def cotizacion_calcular(request, pk: int):
                 descuentos=r.descuentos,
                 iva=r.iva,
                 prima_total=r.prima_total,
-                forma_pago=r.forma_pago or "",
-                meses=r.meses,
+                forma_pago=forma,
+                meses=meses,
                 observaciones="",
                 ranking=r.ranking or 0,
                 seleccionada=False,
@@ -557,133 +588,6 @@ def cotizacion_calcular(request, pk: int):
     messages.success(request, "Opciones calculadas correctamente.")
     return redirect("ui:cotizacion_detail", pk=cot.pk)
 
-@login_required
-@permission_required("cotizador.change_cotizacion", raise_exception=True)
-@require_POST
-@transaction.atomic
-def cotizacion_calcular2(request, pk: int):
-    """
-    Genera opciones (CotizacionItem) para una cotización.
-    - Preferente: motor real tarifas (RatingEngine)
-    - Fallback: stub robusto (combos únicos)
-    """
-    cot = get_object_or_404(Cotizacion, pk=pk)
-
-    if not _is_admin(request.user) and cot.owner_id != request.user.id:
-        return HttpResponseForbidden("No autorizado para recalcular esta cotización.")
-
-    if cot.estatus not in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA]:
-        messages.warning(request, "Esta cotización ya no se puede recalcular.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    # Limpia items previos (cascade borra coberturas/calculo/reglas)
-    cot.items.all().delete()
-
-    # 1) Intentar motor real
-    try:
-        engine = RatingEngine()
-        results = engine.quote(cot)  # debe regresar lista de QuoteResult
-    except NotImplementedError:
-        results = None
-    except Exception as e:
-        # si el motor falla, mostramos error y caemos a stub si quieres
-        messages.warning(request, f"Motor de tarifas no disponible ({e}). Usando modo demo.")
-        results = None
-
-    # si los catalogos estan vacios, no hace nada
-    if not results:
-        messages.error(
-            request,
-            "No se pudieron generar opciones de cotización. "
-            "Verifica que existan aseguradoras y productos activos en los catálogos."
-        )
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    if results:
-        created = 0
-        for i, r in enumerate(results, start=1):
-            item = CotizacionItem.objects.create(
-                cotizacion=cot,
-                aseguradora_id=r.aseguradora_id,
-                producto_id=r.producto_id,
-                prima_neta=r.prima_neta,
-                derechos=r.derechos,
-                recargos=r.recargos,
-                descuentos=r.descuentos,
-                iva=r.iva,
-                prima_total=r.prima_total,
-                forma_pago=r.forma_pago or "",
-                meses=r.meses,
-                observaciones="",
-                ranking=r.ranking or i,
-                seleccionada=False,
-            )
-
-            # cálculo (trazabilidad)
-            CotizacionItemCalculo.objects.create(
-                item=item,
-                prima_base=getattr(r, "prima_base", Decimal("0.00")),
-                factor_total=getattr(r, "factor_total", Decimal("1.0")),
-                detalle_json=getattr(r, "detalle_json", None) or {},
-            )
-
-            # coberturas
-            for c in (getattr(r, "coberturas", None) or []):
-                CotizacionItemCobertura.objects.create(
-                    item=item,
-                    cobertura_id=c["cobertura_id"],
-                    incluida=c.get("incluida", True),
-                    valor=c.get("valor", ""),
-                    notas=c.get("notas", ""),
-                )
-
-            # reglas aplicadas
-            for idx, rr in enumerate((getattr(r, "reglas", None) or []), start=1):
-                CotizacionItemReglaAplicada.objects.create(
-                    item=item,
-                    regla_id=rr["regla_id"],
-                    resultado=rr["resultado"],
-                    valor_resultante=rr.get("valor_resultante", ""),
-                    mensaje=rr.get("mensaje", ""),
-                    orden=idx,
-                )
-
-            created += 1
-
-        messages.success(request, f"Opciones generadas por motor: {created}.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    # 2) Fallback STUB robusto (combos únicos)
-    aseguradoras = list(Aseguradora.objects.all()[:10])
-    productos = list(ProductoSeguro.objects.all()[:10])
-
-    if not aseguradoras or not productos:
-        messages.error(request, "No hay aseguradoras/productos en catálogos para generar opciones.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    combos = list(product(aseguradoras, productos))
-    max_items = 3
-    to_create = combos[:max_items]
-
-    base = Decimal("8500.00")
-    for i, (aseg, prod) in enumerate(to_create, start=1):
-        CotizacionItem.objects.create(
-            cotizacion=cot,
-            aseguradora=aseg,
-            producto=prod,
-            prima_neta=base + Decimal(i - 1) * Decimal("900.00"),
-            derechos=Decimal("450.00"),
-            recargos=Decimal("0.00"),
-            descuentos=Decimal("0.00"),
-            iva=Decimal("0.00"),
-            prima_total=(base + Decimal(i - 1) * Decimal("900.00")) + Decimal("450.00"),
-            forma_pago="CONTADO",
-            ranking=i,
-        )
-
-    messages.success(request, f"Opciones generadas (modo demo): {len(to_create)}.")
-    return redirect("ui:cotizacion_detail", pk=cot.pk)
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.db import transaction
@@ -711,6 +615,18 @@ from polizas.services import log_poliza_event
 def cotizacion_emitir_poliza(request, pk: int):
     cot = get_object_or_404(Cotizacion, pk=pk)
 
+    # recibe selected_item, el template lo pasa por POST
+    selected_item_id = request.POST.get("selected_item_id")
+    if not selected_item_id:
+        messages.error(request, "Selecciona una opción antes de emitir la póliza.")
+        return redirect("ui:cotizacion_detail", pk=cot.pk)
+
+    selected_item = get_object_or_404(
+        CotizacionItem,
+        pk=selected_item_id,
+        cotizacion=cot,  # asegura que pertenece a esa cotización
+    )
+
     # cartera
     user = request.user
     is_admin = user.is_superuser or user.groups.filter(name="Admin").exists()
@@ -723,11 +639,6 @@ def cotizacion_emitir_poliza(request, pk: int):
         messages.warning(request, "Esta cotización no permite emisión.")
         return redirect("ui:cotizacion_detail", pk=cot.pk)
 
-    selected_item = cot.items.filter(seleccionada=True).select_related("aseguradora", "producto").first()
-    if not selected_item:
-        messages.error(request, "Primero selecciona una opción para emitir póliza.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
     # Evitar doble emisión: si ya existe póliza vinculada a este item
     existente = Poliza.objects.filter(cotizacion_item=selected_item).first()
     if existente:
@@ -735,6 +646,9 @@ def cotizacion_emitir_poliza(request, pk: int):
         # si luego haces PolizaDetailView, aquí redirigimos allí
         return redirect("ui:poliza_list")
 
+    #fp = selected_item.forma_pago or cot.forma_pago_preferida
+    fp = cot.forma_pago_preferida
+    
     with transaction.atomic():
         # número de póliza: placeholder (hasta integrar emisión real con aseguradora)
         numero = f"TEMP-{selected_item.cotizacion.folio}"
@@ -752,7 +666,7 @@ def cotizacion_emitir_poliza(request, pk: int):
             vigencia_hasta=cot.vigencia_hasta,
             estatus=Poliza.Estatus.EN_PROCESO,
             prima_total=selected_item.prima_total,
-            forma_pago=selected_item.forma_pago or cot.forma_pago_preferida or "",
+            forma_pago=fp,
             agente=cot.owner,
         )
 
@@ -776,70 +690,6 @@ def cotizacion_emitir_poliza(request, pk: int):
     )
 
     messages.success(request, f"Póliza creada en proceso: {poliza.numero_poliza}")
-    return redirect("ui:poliza_list")
-
-@login_required
-@permission_required("polizas.add_poliza", raise_exception=True)
-@require_POST
-@transaction.atomic
-def cotizacion_emitir(request, pk: int):
-    cot = get_object_or_404(Cotizacion, pk=pk)
-
-    # Regla de cartera (igual que tu DetailView)
-    if not _is_admin(request.user) and cot.owner_id != request.user.id:
-        return HttpResponseForbidden("No autorizado para emitir pólizas de esta cotización.")
-
-    # Debe existir item seleccionado
-    item = (
-        CotizacionItem.objects
-        .select_related("aseguradora", "producto", "cotizacion")
-        .filter(cotizacion=cot, seleccionada=True)
-        .first()
-    )
-    if not item:
-        messages.error(request, "Primero selecciona una opción para poder emitir.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    if Poliza.objects.filter(cotizacion_item=item).exists():
-        messages.warning(request, "Esta opción ya fue emitida como póliza.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    # (Opcional) solo permitir emisión en ciertos estados
-    if cot.estatus not in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA, Cotizacion.Estatus.ACEPTADA]:
-        messages.warning(request, "Esta cotización no está en un estado válido para emitir.")
-        return redirect("ui:cotizacion_detail", pk=cot.pk)
-
-    # Genera número único por aseguradora (cumple uq_poliza_por_aseguradora)
-    numero = generar_numero_poliza(item.aseguradora_id)
-
-    # Respeta el CheckConstraint: vehiculo XOR flotilla
-    vehiculo = cot.vehiculo if cot.tipo_cotizacion == Cotizacion.Tipo.INDIVIDUAL else None
-    flotilla = cot.flotilla if cot.tipo_cotizacion == Cotizacion.Tipo.FLOTILLA else None
-
-    poliza = Poliza.objects.create(
-        cliente=cot.cliente,
-        vehiculo=vehiculo,
-        flotilla=flotilla,
-        aseguradora=item.aseguradora,
-        producto=item.producto,
-        cotizacion_item=item,
-        numero_poliza=numero,
-        vigencia_desde=cot.vigencia_desde,
-        vigencia_hasta=cot.vigencia_hasta,
-        estatus=Poliza.Estatus.EN_PROCESO,
-        prima_total=item.prima_total,
-        forma_pago=item.forma_pago or cot.forma_pago_preferida or "",
-        agente=cot.owner or request.user,
-        # documento=None (cuando adjuntes PDF/XML de póliza)
-    )
-
-    # Marca cotización como aceptada (o “convertida” si luego agregas ese estatus)
-    if cot.estatus != Cotizacion.Estatus.ACEPTADA:
-        cot.estatus = Cotizacion.Estatus.ACEPTADA
-        cot.save(update_fields=["estatus"])
-
-    messages.success(request, f"Póliza creada: {poliza.numero_poliza}")
-    #return redirect("ui:poliza_detail", pk=poliza.pk) ***
     return redirect("ui:poliza_list")
 
 # Crea Cotizacion en ui
@@ -870,7 +720,6 @@ class CotizacionWizardDatosView(LoginRequiredMixin, PermissionRequiredMixin, Cre
         return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
-        print("INITIAL:", self.get_initial())
         return super().get(request, *args, **kwargs)
 
     def get_initial(self):

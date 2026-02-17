@@ -73,6 +73,21 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
             ("manage_portal_activo", "Puede activar/desactivar portal de clientes"),
 
         ]
+    @property
+    def nombre_mostrar(self):
+        partes = [
+            self.nombre or "",
+            self.apellido_paterno or "",
+            self.apellido_materno or "",
+        ]
+
+        nombre_completo = " ".join(p.strip() for p in partes if p and p.strip())
+
+        if nombre_completo:
+            return nombre_completo
+
+        return self.nombre_comercial or ""
+
 
     def __str__(self):
         if self.tipo_cliente == self.TipoCliente.EMPRESA:

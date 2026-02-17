@@ -16,7 +16,12 @@
     <div class="d-flex align-items-center gap-2">
       <span class="text-muted small">Rol: {{ role_label }}</span>
       <span class="text-muted small">{{ request.user.username }}</span>
-      <a class="btn btn-outline-secondary btn-sm" href="/admin/">Admin</a>
+      <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+          Salir
+        </button>
+      </form>
     </div>
   </div>
 </nav>

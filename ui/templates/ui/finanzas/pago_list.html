@@ -1,7 +1,6 @@
 {% extends "ui/base.html" %}
-{% load tz %}
-
 {% block content %}
+
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">Pagos</h4>
   <a class="btn btn-outline-secondary" href="{% url 'ui:dashboard' %}">
@@ -14,8 +13,7 @@
     <form method="get" class="row g-2 align-items-end">
       <div class="col-12 col-md-4">
         <label class="form-label">Buscar</label>
-        <input name="q" value="{{ filters.q }}" class="form-control"
-               placeholder="Póliza, cliente o referencia">
+        <input name="q" value="{{ filters.q }}" class="form-control" placeholder="Póliza, cliente o referencia">
       </div>
 
       <div class="col-12 col-md-2">
@@ -53,14 +51,14 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
-            <th>Fecha</th>
+            <th>Programado</th>
             <th>Póliza</th>
             <th>Cliente</th>
             <th class="text-end">Monto</th>
+            <th>Estatus</th>
             <th>Método</th>
             <th>Referencia</th>
-            <th>Estatus</th>
-            <th></th>
+            <th class="text-center">Acción</th>
           </tr>
         </thead>
 
@@ -75,8 +73,6 @@
               </td>
               <td>{{ p.poliza.cliente }}</td>
               <td class="text-end">${{ p.monto|floatformat:2 }}</td>
-              <td>{{ p.metodo|default:"—" }}</td>
-              <td class="text-nowrap">{{ p.referencia|default:"—" }}</td>
               <td>
                 {% if p.estatus == "VENCIDO" %}
                   <span class="badge bg-danger">Vencido</span>
@@ -88,16 +84,130 @@
                   <span class="badge bg-secondary">{{ p.get_estatus_display }}</span>
                 {% endif %}
               </td>
+              <td>
+                {% if p.estatus == "PAGADO" %}
+                    {{ p.metodo|default:"—" }}
+                {% else %}
+                    <span class="text-muted">—</span>
+                {% endif %}
+                </td>
+
+                <td class="text-nowrap">
+                {% if p.estatus == "PAGADO" %}
+                    {{ p.referencia|default:"—" }}
+                {% else %}
+                    <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+
               <td class="text-end">
-                {# Fase 1: solo ver póliza; luego: marcar pagado #}
-                <a href="{% url 'ui:poliza_detail' p.poliza_id %}" class="btn btn-sm btn-outline-secondary">
-                  Ver póliza
-                </a>
+                <div class="d-inline-flex gap-2">
+                    <!-- abre modal para subir comprobante de pago -->
+                    {% if p.estatus == "PAGADO" and can_see_pagos %}
+
+                      <button type="button"
+                              class="btn btn-sm btn-outline-secondary py-0 px-2"
+                              style="font-size:.75rem;"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalComprobante{{ p.id }}">
+                        <i class="bi bi-upload me-1"></i> Subir
+                      </button>
+                    {% endif %}
+
+                    {% if p.comprobante_id %}  <!-- p.comprobante %} -->
+                    
+                      <a href="{% url 'documentos:download' p.comprobante_id %}"
+                        class="btn btn-outline-primary px-2 py-1"
+                        style="font-size:0.75rem; line-height:1;"
+                        target="_blank" rel="noopener">
+                        <i class="bi bi-paperclip me-1" style="font-size:0.75rem;"></i>
+                        Ver comprobante
+                      </a>
+
+                    {% endif %}                
+
+                    {% if p.estatus != "PAGADO" and can_see_pagos %}
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalMarcarPagado"
+                        data-pago-id="{{ p.pk }}"
+                        data-poliza="{{ p.poliza.numero_poliza }}"
+                        data-cliente="{{ p.poliza.cliente }}"
+                        data-monto="{{ p.monto|floatformat:2 }}"
+                        data-fecha="{{ p.fecha_programada|date:'Y-m-d' }}"
+                    >
+                        <i class="bi bi-check2-circle me-1"></i> Confirmar pago
+                    </button>
+
+                    {% else %}
+                        {% if p.estatus == "PAGADO" %}
+                        <div class="text-end align-middle">
+                            <span class="badge bg-success-subtle text-success fw-normal" style="font-size:0.7rem;">
+                                Pagado {{ p.fecha_pago|date:"d/M/Y" }}
+                            </span>
+                        </div>
+                        
+                        {% endif %}
+                    {% endif %}
+                </div>
               </td>
             </tr>
+
+            <!-- modal para subir comprobante de pago -->
+            <div class="modal fade" id="modalComprobante{{ p.id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <div class="modal-header">
+                    <h5 class="modal-title">Subir comprobante</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                  </div>
+
+                  <form method="post"
+                        action="{% url 'ui:pago_comprobante_subir' p.pk %}"
+                        enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="modal-body">
+                      <div class="mb-2 text-muted small">
+                        Pago: <strong>{{ p.poliza.numero_poliza }}</strong> ·
+                        ${{ p.monto|floatformat:2 }} ·
+                        {{ p.fecha_programada|date:"d/M/Y" }}
+                      </div>
+
+                      <div class="mb-3">
+                        <label class="form-label">Archivo (PDF / JPG / PNG)</label>
+                        <input class="form-control" type="file" name="archivo" accept="application/pdf,image/*" required>
+                      </div>
+
+                      <div class="mb-0">
+                        <label class="form-label">Nombre (opcional)</label>
+                        <input class="form-control" type="text" name="nombre_archivo" placeholder="Ej. Comprobante_febrero.pdf">
+                      </div>
+
+                      {% if p.comprobante_id %}
+                        <div class="alert alert-warning small mt-3 mb-0">
+                          Este pago ya tiene comprobante. Se reemplazará al subir uno nuevo.
+                        </div>
+                      {% endif %}
+                    </div>
+
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i> Subir
+                      </button>
+                    </div>
+                  </form>
+
+                </div>
+              </div>
+            </div>
           {% empty %}
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">
+              <td colspan="6" class="text-center text-muted py-4">
                 No hay pagos con esos filtros.
               </td>
             </tr>
@@ -108,4 +218,96 @@
     </div>
   </div>
 </div>
+
+<!-- Modal para marcar pagado  -->
+ <div class="modal fade" id="modalMarcarPagado" tabindex="-1" aria-labelledby="modalMarcarPagadoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="formMarcarPagado" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalMarcarPagadoLabel">Confirmar Pago</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-2">
+            <div class="text-muted small">Póliza</div>
+            <div class="fw-semibold" id="mp_poliza">—</div>
+            <div class="text-muted small" id="mp_cliente">—</div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small">Monto</span>
+            <span class="badge bg-success-subtle text-success" id="mp_monto">$0.00</span>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Fecha de pago</label>
+              <input type="date" name="fecha_pago" id="mp_fecha_pago" class="form-control" required>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="form-label">Método</label>
+              <input type="text" name="metodo" class="form-control" placeholder="Ej. Transferencia / Efectivo">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Referencia</label>
+              <input type="text" name="referencia" class="form-control" placeholder="Folio / autorización / referencia bancaria">
+            </div>
+          </div>
+
+          <div class="form-text mt-2">
+            Esto cambiará el estatus del pago a <strong>PAGADO</strong>.
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check2-circle me-1"></i> Confirmar pago
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- script para el modal de marcar como pagado -->
+<script>
+  (function () {
+    const modal = document.getElementById('modalMarcarPagado');
+    const form = document.getElementById('formMarcarPagado');
+
+    const elPoliza = document.getElementById('mp_poliza');
+    const elCliente = document.getElementById('mp_cliente');
+    const elMonto = document.getElementById('mp_monto');
+    const elFechaPago = document.getElementById('mp_fecha_pago');
+
+    modal.addEventListener('show.bs.modal', function (event) {
+      const btn = event.relatedTarget;
+
+      const pagoId = btn.getAttribute('data-pago-id');
+      const poliza = btn.getAttribute('data-poliza') || '—';
+      const cliente = btn.getAttribute('data-cliente') || '';
+      const monto = btn.getAttribute('data-monto') || '0.00';
+      const fecha = btn.getAttribute('data-fecha') || '';
+
+      // labels
+      elPoliza.textContent = poliza;
+      elCliente.textContent = cliente;
+      elMonto.textContent = '$' + monto;
+
+      // default date: hoy o fecha programada (aquí usamos fecha programada)
+      elFechaPago.value = fecha;
+
+      // set form action ->  /ui/pagos/<id>/marcar-pagado/
+      form.action = "{% url 'ui:pago_marcar_pagado' 0 %}".replace("/0/", "/" + pagoId + "/");
+    });
+  })();
+</script>
+
 {% endblock %}

@@ -30,7 +30,7 @@
   <div class="row g-2 align-items-center">
     <div class="col-12 col-md-8">
       <input class="form-control" name="q" value="{{ q }}"
-             placeholder="{% if tab == 'mis' %}Buscar por placas, VIN, marca, año...{% else %}Buscar por marca, submarca, año, AMIS...{% endif %}">
+             placeholder="{% if tab == 'mis' %}Buscar por placas, serie, marca, año...{% else %}Buscar por marca, submarca, año, AMIS...{% endif %}">
     </div>
     <div class="col-12 col-md-4 d-grid">
       <button class="btn btn-outline-secondary">Buscar</button>
@@ -46,7 +46,7 @@
           <tr>
             <th>Vehículo</th>
             <th>Placas</th>
-            <th>VIN</th>
+            <th>Num Serie</th>
             <th>Uso</th>
             <th class="text-end">Acción</th>
           </tr>
@@ -127,7 +127,7 @@
                     <input name="placas" class="form-control form-control-sm d-inline"
                            style="width:120px;" placeholder="Placas">
                     <input name="vin" class="form-control form-control-sm d-inline"
-                           style="width:160px;" placeholder="VIN">
+                           style="width:160px;" placeholder="Serie">
                     <button class="btn btn-sm btn-primary">Crear</button>
                   </form>
                 {% else %}

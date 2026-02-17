@@ -169,9 +169,7 @@ class CotizacionDatosForm(forms.ModelForm):
         widgets = {
             "vigencia_desde": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
             "vigencia_hasta": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
-#            "vigencia_desde": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-#            "vigencia_hasta": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-            "forma_pago_preferida": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Contado / Mensual"}),
+            "forma_pago_preferida": forms.Select(attrs={"class": "form-select"}),
             "notas": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
     def __init__(self, *args, **kwargs):
@@ -179,6 +177,10 @@ class CotizacionDatosForm(forms.ModelForm):
 
         self.fields["vigencia_desde"].input_formats = ["%Y-%m-%d"]
         self.fields["vigencia_hasta"].input_formats = ["%Y-%m-%d"]
+#        self.fields["forma_pago_preferida"].widget.attrs.update({
+#            "class": "form-select"
+#        })
+
         # Solo en GET (no bound) y solo si vienen vacías en la instancia
         if not self.is_bound:
             today = timezone.localdate()

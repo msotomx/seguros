@@ -1,3 +1,3 @@
-from .base import TimeStampedModel, SoftDeleteModel, MoneyMixin
+from .base import TimeStampedModel, SoftDeleteModel, MoneyMixin, FormaPagoChoices
 
-__all__ = ["TimeStampedModel", "SoftDeleteModel", "MoneyMixin"]
+__all__ = ["TimeStampedModel", "SoftDeleteModel", "MoneyMixin", "FormaPagoChoices"]

@@ -1,5 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
+from django.db.models import Sum, Q
 from django.http import HttpResponseForbidden
 from django.views.generic import ListView, DetailView
 
@@ -10,37 +10,21 @@ from django.shortcuts import get_object_or_404, redirect
 from django.utils.timezone import localdate
 from django.views.decorators.http import require_POST
 from datetime import timedelta, datetime
+from django.utils import timezone
+
+from polizas.services import log_poliza_event
+from ui.services.perms import can_manage_poliza
+from ui.services.perms import can_update_poliza_numero, can_admin_polizas
 
 from polizas.models import PolizaEvento
 from polizas.models import Poliza
-from polizas.services import log_poliza_event
-from ui.services.perms import can_manage_poliza
+from finanzas.models import Pago, Comision
+from documentos.models import Documento
+from documentos.views import documento_download
+
 
 def _is_admin(user) -> bool:
     return user.is_superuser or user.groups.filter(name="Admin").exists()
-
-class PolizaDetailView(LoginRequiredMixin, DetailView):
-    model = Poliza
-    template_name = "ui/polizas/poliza_detail.html"
-    context_object_name = "poliza"
-
-    def get_queryset(self):
-        qs = Poliza.objects.select_related(
-            "cliente", "aseguradora", "producto", "vehiculo", "flotilla", "agente", "documento"
-        )
-
-        user = self.request.user
-        if user.groups.filter(name="Agente").exists():
-            qs = qs.filter(agente=user)
-
-        return qs
-    
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        poliza = ctx["poliza"]
-        ctx["eventos"] = poliza.eventos.select_related("actor").all()[:50]
-
-        return ctx
 
 class PolizaListView(LoginRequiredMixin, ListView):
     model = Poliza
@@ -79,6 +63,7 @@ class PolizaListView(LoginRequiredMixin, ListView):
             qs = qs.filter(
                 Q(numero_poliza__icontains=q)
                 | Q(cliente__nombre__icontains=q)
+                | Q(cliente__nombre_comercial__icontains=q)
                 | Q(cliente__rfc__icontains=q)
             )
 
@@ -106,7 +91,82 @@ class PolizaListView(LoginRequiredMixin, ListView):
         ctx["estatus_choices"] = getattr(Poliza, "Estatus", None).choices if hasattr(Poliza, "Estatus") else []
         return ctx
 
+class PolizaDetailView(LoginRequiredMixin, DetailView):
+    model = Poliza
+    template_name = "ui/polizas/poliza_detail.html"
+    context_object_name = "poliza"
+
+    def get_queryset(self):
+        qs = Poliza.objects.select_related(
+            "cliente", "aseguradora", "producto", "vehiculo", "flotilla", "agente", "documento"
+        )
+
+        user = self.request.user
+        if user.groups.filter(name="Agente").exists():
+            qs = qs.filter(agente=user)
+
+        return qs
+    
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        poliza = ctx["poliza"]
+        ctx["eventos"] = poliza.eventos.select_related("actor").all()[:50]
+        ctx["ult_pagos"] = poliza.pagos.order_by("fecha_programada")[:6]
+        ctx["comision"] = poliza.comisiones.order_by("-created_at").first()
+        ctx["can_admin_polizas"] = can_admin_polizas(self.request.user)
+
+        # --- PAGOS ---
+        pagos_qs = poliza.pagos.all().order_by("fecha_programada")
+        pagos_sum = pagos_qs.aggregate(
+            total=Sum("monto"),
+            pagado=Sum("monto", filter=Q(estatus=Pago.Estatus.PAGADO)),
+            pendiente=Sum("monto", filter=Q(estatus=Pago.Estatus.PENDIENTE)),
+            vencido=Sum("monto", filter=Q(estatus=Pago.Estatus.VENCIDO)),
+        )
+        pagos_total = pagos_sum["total"] or 0
+        pagos_pagado = pagos_sum["pagado"] or 0
+        pagos_pendiente = pagos_sum["pendiente"] or 0
+        pagos_vencido = pagos_sum["vencido"] or 0
+        pagos_saldo = (pagos_total or 0) - (pagos_pagado or 0)
+
+        # Últimos / próximos pagos (para vista rápida)
+        ult_pagos = pagos_qs.order_by("-fecha_programada")[:5]
+        prox_pagos = pagos_qs.filter(estatus__in=[Pago.Estatus.PENDIENTE, Pago.Estatus.VENCIDO]).order_by("fecha_programada")[:5]
+
+        # --- COMISIONES ---
+        com_qs = poliza.comisiones.all().order_by("-created_at")
+        com_sum = com_qs.aggregate(
+            total=Sum("monto"),
+            pagada=Sum("monto", filter=Q(estatus=Comision.Estatus.PAGADA)),
+            pendiente=Sum("monto", filter=Q(estatus=Comision.Estatus.PENDIENTE)),
+        )
+        com_total = com_sum["total"] or 0
+        com_pagada = com_sum["pagada"] or 0
+        com_pendiente = com_sum["pendiente"] or 0
+        ultima_comision = com_qs.first()
+
+        ctx["fin"] = {
+            "pagos": {
+                "total": pagos_total,
+                "pagado": pagos_pagado,
+                "pendiente": pagos_pendiente,
+                "vencido": pagos_vencido,
+                "saldo": pagos_saldo,
+                "ult": ult_pagos,
+                "prox": prox_pagos,
+            },
+            "comisiones": {
+                "total": com_total,
+                "pagada": com_pagada,
+                "pendiente": com_pendiente,
+                "ultima": ultima_comision,
+            },
+        }
+        return ctx
+
+
 from finanzas.services.pagos import crear_plan_pagos
+from finanzas.services.comisiones import crear_comision_poliza
 
 @login_required
 @require_POST
@@ -139,6 +199,8 @@ def poliza_marcar_vigente(request, pk):
 
         # crear pagos después
         n = crear_plan_pagos(poliza, overwrite=False)
+        # genera comisiones de la poliza
+        crear_comision_poliza(poliza, overwrite=False)
 
         # Actualizar Bitacora de Eventos
         log_poliza_event(
@@ -156,6 +218,55 @@ def poliza_marcar_vigente(request, pk):
 @login_required
 @require_POST
 def poliza_actualizar_numero(request, pk):
+    poliza = get_object_or_404(Poliza, pk=pk)
+
+    if not can_update_poliza_numero(request.user, poliza):
+        messages.error(request, "No tienes permisos para modificar el número de póliza.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    nuevo = (request.POST.get("numero_poliza") or "").strip().upper()
+
+    if not nuevo:
+        messages.error(request, "Captura el número de póliza.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    if nuevo.startswith("TEMP-"):
+        messages.error(request, "El número real no debe iniciar con TEMP-.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    anterior = poliza.numero_poliza
+
+    if nuevo == anterior:
+        messages.info(request, "No hubo cambios en el número de póliza.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+    try:
+        with transaction.atomic():
+            poliza.numero_poliza = nuevo
+            poliza.save(update_fields=["numero_poliza", "updated_at"])
+
+            log_poliza_event(
+                poliza=poliza,
+                tipo=PolizaEvento.Tipo.NUMERO_ACTUALIZADO,
+                actor=request.user,
+                titulo="Número de póliza actualizado",
+                data={"antes": anterior, "despues": nuevo},
+            )
+
+    except IntegrityError:
+        # Por tu UniqueConstraint: (aseguradora, numero_poliza)
+        messages.error(
+            request,
+            f"Ya existe una póliza con ese número para {poliza.aseguradora.nombre}."
+        )
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    messages.success(request, "Número de póliza actualizado.")
+    return redirect("ui:poliza_detail", pk=poliza.pk)
+
+
+@login_required
+@require_POST
+def poliza_actualizar_numero2(request, pk):
     poliza = get_object_or_404(Poliza.objects.select_related("aseguradora"), pk=pk)
 
     # Permisos / alcance 
@@ -246,7 +357,12 @@ def poliza_cancelar(request, pk):
         poliza.fecha_cancelacion = localdate()
         poliza.motivo_cancelacion = motivo
         poliza.motivo_cancelacion_detalle = detalle
-        poliza.save()  # updated_at se actualiza
+        poliza.save()
+
+        # Cambia estatus de Pagos a Cancelado
+        poliza.pagos.filter(
+            estatus__in=[Pago.Estatus.PENDIENTE, Pago.Estatus.VENCIDO]
+        ).update(estatus=Pago.Estatus.CANCELADO)
 
         # Actualizar Bitacora de Eventos
         log_poliza_event(
@@ -428,4 +544,55 @@ def poliza_actualizar_vigencia(request, pk):
         )
 
     messages.success(request, "Vigencia actualizada.")
+    return redirect("ui:poliza_detail", pk=poliza.pk)
+
+
+@login_required
+@require_POST
+def poliza_documento_subir(request, pk):
+    poliza = get_object_or_404(Poliza, pk=pk)
+
+    # Permisos: Admin/Supervisor siempre; Agente solo su póliza
+    if not (can_admin_polizas(request.user) or poliza.agente_id == request.user.id):
+        messages.error(request, "No tienes permisos para adjuntar documentos a esta póliza.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    archivo = request.FILES.get("archivo")
+    if not archivo:
+        messages.error(request, "Selecciona un archivo para subir.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    # Validación simple: PDF
+    if not (archivo.name.lower().endswith(".pdf") or (archivo.content_type or "").lower() == "application/pdf"):
+        messages.error(request, "Solo se permite subir PDF.")
+        return redirect("ui:poliza_detail", pk=poliza.pk)
+
+    # Crear Documento y asignarlo a póliza
+    with transaction.atomic():
+        doc = Documento.objects.create(
+            nombre_archivo=(request.POST.get("nombre_archivo") or archivo.name).strip() or archivo.name,
+            tipo=Documento.Tipo.PDF,
+            file=archivo,
+            tamano=getattr(archivo, "size", 0) or 0,
+            subido_por=request.user,
+        )
+
+        anterior_id = poliza.documento_id
+        poliza.documento = doc
+        poliza.save(update_fields=["documento", "updated_at"])
+
+        # Bitácora
+        log_poliza_event(
+            poliza=poliza,
+            tipo=PolizaEvento.Tipo.POLIZA_DOCUMENTO_ADJUNTADO,
+            actor=request.user,
+            titulo="Documento de póliza adjuntado",
+            data={
+                "documento_id": doc.id,
+                "nombre_archivo": doc.nombre_archivo,
+                "reemplazo_de": anterior_id,
+            },
+        )
+
+    messages.success(request, "Documento adjuntado correctamente.")
     return redirect("ui:poliza_detail", pk=poliza.pk)

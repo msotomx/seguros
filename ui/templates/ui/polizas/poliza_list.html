@@ -118,7 +118,7 @@
                 </td>
 
                 <td>
-                  <div class="fw-semibold">{{ p.cliente.nombre }}</div>
+                  <div class="fw-semibold">{{ p.cliente.nombre_mostrar|truncatechars:25 }}</div>
                   <div class="text-muted small">
                     {% if p.vehiculo %}
                       {{ p.vehiculo }}
@@ -170,9 +170,9 @@
                   <a class="btn btn-sm btn-outline-primary" href="{% url 'ui:poliza_detail' p.pk %}">
                     Ver
                   </a>
-
+                  <!-- BOTON DOCUMENTO -->
                   {% if p.documento_id %}
-                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'ui:documento_detail' p.documento_id %}">
+                    <a class="btn btn-sm btn-outline-secondary" href="">
                       Documento
                     </a>
                   {% endif %}

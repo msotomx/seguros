@@ -40,7 +40,7 @@ def crear_plan_pagos(poliza: Poliza, *, overwrite=False):
     else:
         # fallback razonable
         n, step_days = 1, None
-
+    
     with transaction.atomic():
         qs = Pago.objects.filter(poliza=poliza).exclude(estatus=Pago.Estatus.CANCELADO)
 

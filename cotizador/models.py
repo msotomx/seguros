@@ -10,6 +10,7 @@ from tarifas.models import ReglaTarifa
 
 from django.db import transaction
 from django.utils import timezone
+from core.models import FormaPagoChoices
 
 # ---------------------------------------------------------------------
 # Folios de Cotizaciones 
@@ -58,12 +59,6 @@ class Cotizacion(TimeStampedModel):
         RECHAZADA = "RECHAZADA", "Rechazada"
         VENCIDA = "VENCIDA", "Vencida"
 
-    class FormaPago(models.TextChoices):
-        CONTADO = "CONTADO", "Contado"
-        MENSUAL = "MENSUAL", "Mensual"
-        TRIMESTRAL = "TRIMESTRAL", "Trimestral"
-        SEMESTRAL = "SEMESTRAL", "Semestral"
-
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
     flotilla = models.ForeignKey(Flotilla, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
@@ -76,9 +71,10 @@ class Cotizacion(TimeStampedModel):
 
     forma_pago_preferida = models.CharField(
         max_length=30,
-        choices=FormaPago.choices,
+        choices=FormaPagoChoices.choices,
+        default=FormaPagoChoices.CONTADO,
         blank=True,
-        default=FormaPago.CONTADO,
+        db_index=True,
     )
     notas = models.TextField(blank=True, default="")
     estatus = models.CharField(max_length=10, choices=Estatus.choices, default=Estatus.BORRADOR, db_index=True)
@@ -132,7 +128,14 @@ class CotizacionItem(TimeStampedModel, MoneyMixin):
     iva = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     prima_total = models.DecimalField(max_digits=14, decimal_places=2, default=0, db_index=True)
 
-    forma_pago = models.CharField(max_length=30, blank=True, default="")
+    forma_pago = models.CharField(
+            max_length=30,
+            choices=FormaPagoChoices.choices,
+            blank=True,
+            default="",
+            db_index=True,
+            help_text="Opcional. Si se define, sobreescribe la forma de pago de la cotización."
+        )
     meses = models.PositiveIntegerField(null=True, blank=True)
     observaciones = models.TextField(blank=True, default="")
     ranking = models.IntegerField(default=0, db_index=True)

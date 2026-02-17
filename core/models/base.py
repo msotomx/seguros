@@ -26,3 +26,9 @@ class MoneyMixin(models.Model):
 
     class Meta:
         abstract = True
+
+class FormaPagoChoices(models.TextChoices):
+    CONTADO = "CONTADO", "Contado"
+    MENSUAL = "MENSUAL", "Mensual"
+    TRIMESTRAL = "TRIMESTRAL", "Trimestral"
+    SEMESTRAL = "SEMESTRAL", "Semestral"

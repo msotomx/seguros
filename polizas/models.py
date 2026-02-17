@@ -9,6 +9,7 @@ from crm.models import Cliente
 from autos.models import Vehiculo, Conductor, Flotilla
 from catalogos.models import Aseguradora, ProductoSeguro
 from cotizador.models import CotizacionItem
+from core.models import FormaPagoChoices
 
 # ---------------------------------------------------------------------
 # Pólizas / Endosos / Renovaciones
@@ -26,12 +27,6 @@ class Poliza(TimeStampedModel, MoneyMixin):
             ERROR_EMISION = "ERROR_EMISION", "Error en emisión"
             CAMBIO_ASEGURADORA = "CAMBIO_ASEGURADORA", "Cambio de aseguradora"
             OTRO = "OTRO", "Otro"
-
-    class FormaPago(models.TextChoices):
-        CONTADO = "CONTADO", "Contado"
-        MENSUAL = "MENSUAL", "Mensual"
-        TRIMESTRAL = "TRIMESTRAL", "Trimestral"
-        SEMESTRAL = "SEMESTRAL", "Semestral"
 
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="polizas")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
@@ -51,9 +46,10 @@ class Poliza(TimeStampedModel, MoneyMixin):
     prima_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     forma_pago = models.CharField(
         max_length=30,
-        choices=FormaPago.choices,
+        choices=FormaPagoChoices.choices,
+        default=FormaPagoChoices.CONTADO,
         blank=True,
-        default=FormaPago.CONTADO,
+        db_index=True,
     )
     agente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
     documento = models.ForeignKey(Documento, on_delete=models.SET_NULL, null=True, blank=True, related_name="polizas")
@@ -178,6 +174,11 @@ class PolizaEvento(models.Model):
         MARCADA_VIGENTE = "MARCADA_VIGENTE", "Marcada como vigente"
         CANCELADA = "CANCELADA", "Cancelada"
         RENOVADA = "RENOVADA", "Renovada"
+        PAGO_VENCIDO = "PAGO_VENCIDO", "Pago vencido"
+        PAGO_PAGADO = "PAGO_PAGADO", "Pago pagado"
+        PAGO_CANCELADO = "PAGO_CANCELADO", "Pago cancelado"
+        PAGO_COMPROBANTE_ADJUNTADO = "PAGO_COMPROBANTE_ADJUNTADO", "Comprobante de pago adjuntado"
+        POLIZA_DOCUMENTO_ADJUNTADO = "POLIZA_DOCUMENTO_ADJUNTADO", "Documento de póliza adjuntado"
 
     poliza = models.ForeignKey("polizas.Poliza", on_delete=models.CASCADE, related_name="eventos")
     tipo = models.CharField(max_length=40, choices=Tipo.choices, db_index=True)
