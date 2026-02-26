@@ -1,7 +1,8 @@
-# finanzas/management/commands/mark_pagos_vencidos.py
+# finanzas/management/commands/marcar_pagos_vencidos.py
 # Marca Pagos con estatus PENDIENTE como VENCIDO
 # En PRODUCCION se va a hacer un cron que se ejecute automatico diariamente
 
+# Regla: SI fecha_programada y estatus=PENDIENTE → si fecha_programada < hoy --> VENCIDO.
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.timezone import localdate
@@ -90,10 +91,9 @@ class Command(BaseCommand):
         updated_vencer = 0
 
         with transaction.atomic():
-            for pago in qs_cancelar:
+            for pago in qs_cancelar.iterator(chunk_size=500):
                 pago.estatus = Pago.Estatus.CANCELADO
                 pago.save(update_fields=["estatus", "updated_at"])
-                updated_cancelar += 1
 
                 log_poliza_event(
                     poliza=pago.poliza,
@@ -106,12 +106,12 @@ class Command(BaseCommand):
                         "monto": str(pago.monto),
                         "razon": "POLIZA_CANCELADA",
                     },
+                    dedupe_key=f"PAGO_CANCELADO:{pago.id}",
                 )
 
-            for pago in qs_vencer:
+            for pago in qs_vencer.iterator(chunk_size=500):
                 pago.estatus = Pago.Estatus.VENCIDO
                 pago.save(update_fields=["estatus", "updated_at"])
-                updated_vencer += 1
 
                 log_poliza_event(
                     poliza=pago.poliza,
@@ -123,8 +123,10 @@ class Command(BaseCommand):
                         "fecha_programada": str(pago.fecha_programada),
                         "monto": str(pago.monto),
                     },
+                    dedupe_key=f"PAGO_VENCIDO:{pago.id}",
                 )
 
         self.stdout.write(self.style.SUCCESS(
             f"Actualizados (con bitácora): CANCELADO={updated_cancelar}, VENCIDO={updated_vencer}. (hoy={today})"
         ))
+

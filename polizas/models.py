@@ -177,8 +177,11 @@ class PolizaEvento(models.Model):
         PAGO_VENCIDO = "PAGO_VENCIDO", "Pago vencido"
         PAGO_PAGADO = "PAGO_PAGADO", "Pago pagado"
         PAGO_CANCELADO = "PAGO_CANCELADO", "Pago cancelado"
+        PAGO_RECHAZADO = "PAGO_RECHAZADO", "Pago rechazado"
         PAGO_COMPROBANTE_ADJUNTADO = "PAGO_COMPROBANTE_ADJUNTADO", "Comprobante de pago adjuntado"
         POLIZA_DOCUMENTO_ADJUNTADO = "POLIZA_DOCUMENTO_ADJUNTADO", "Documento de póliza adjuntado"
+        POLIZA_VENCIDA = "POLIZA_VENCIDA", "Póliza Vencida"
+        
 
     poliza = models.ForeignKey("polizas.Poliza", on_delete=models.CASCADE, related_name="eventos")
     tipo = models.CharField(max_length=40, choices=Tipo.choices, db_index=True)
@@ -187,9 +190,25 @@ class PolizaEvento(models.Model):
     data = models.JSONField(blank=True, null=True)  # opcional (antes/después, etc.)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    dedupe_key = models.CharField(
+        max_length=120,
+        null=True,
+        blank=True,
+        default=None,
+        db_index=True,
+        help_text="Clave para evitar duplicados. Ej: PAGO_VENCIDO:123"
+    )
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["poliza", "tipo", "dedupe_key"],
+                condition=Q(dedupe_key__isnull=False),
+                name="uq_poliza_event_dedupe_key",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.poliza_id} {self.tipo} {self.created_at:%Y-%m-%d %H:%M}"
+
