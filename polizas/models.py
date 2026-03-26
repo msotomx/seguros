@@ -75,7 +75,7 @@ class Poliza(TimeStampedModel, MoneyMixin):
             ("manage_polizas", "Puede administrar pólizas"),
             ("renew_poliza", "Puede renovar póliza"),
         ]
-
+        
     def __str__(self):
         return f"{self.numero_poliza} ({self.aseguradora.nombre})"
 

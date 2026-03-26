@@ -1,0 +1,25 @@
+{% extends "portal/base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+  {% if status == "success" %}
+    <div class="alert alert-success">
+      Tu pago fue enviado correctamente. Estamos validándolo.
+    </div>
+  {% elif status == "pending" %}
+    <div class="alert alert-warning">
+      Tu pago está pendiente de confirmación.
+    </div>
+  {% else %}
+    <div class="alert alert-danger">
+      El pago no se completó.
+    </div>
+  {% endif %}
+
+  <a href="{% url 'portal:pago_list' %}" class="btn btn-primary">
+    Volver a mis pagos
+  </a>
+
+</div>
+{% endblock %}

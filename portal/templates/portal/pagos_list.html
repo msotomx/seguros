@@ -1,0 +1,117 @@
+{% extends "portal/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="mb-3">Mis Pagos</h3>
+
+  <!-- Filtros -->
+  <form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+      <select name="estatus" class="form-select">
+        <option value="">-- Todos los estatus --</option>
+        {% for key, label in estatus_choices %}
+          <option value="{{ key }}" {% if key == estatus_actual %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-3">
+      <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" name="pendientes" value="1"
+               {% if solo_pendientes == "1" %}checked{% endif %}>
+        <label class="form-check-label">
+          Solo pendientes
+        </label>
+      </div>
+    </div>
+
+    <div class="col-md-2">
+      <button class="btn btn-primary w-100">Filtrar</button>
+    </div>
+  </form>
+
+  <!-- Tabla -->
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Póliza</th>
+          <th>Concepto</th>
+          <th>Fecha</th>
+          <th>Vencimiento</th>
+          <th>Monto</th>
+          <th>Pagado</th>
+          <th>Estatus</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pagos %}
+        <tr>
+          <td>{{ p.id }}</td>
+
+          <td>
+            {% if p.poliza %}
+              {{ p.poliza.numero_poliza }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>{{ p.concepto }}</td>
+
+          <td>{{ p.fecha_programada }}</td>
+
+          <td>
+            {% if p.fecha_vencimiento %}
+              {{ p.fecha_vencimiento }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>${{ p.monto|floatformat:2|intcomma }}</td>
+
+          <td>
+            {% if p.monto_pagado %}
+              ${{ p.monto_pagado|floatformat:2|intcomma }}
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>
+            <span class="badge 
+              {% if p.estatus == 'PAGADO' %}bg-success
+              {% elif p.estatus == 'PENDIENTE' %}bg-secondary
+              {% elif p.estatus == 'EN_PROCESO' %}bg-info
+              {% elif p.estatus == 'VENCIDO' %}bg-danger
+              {% elif p.estatus == 'PARCIAL' %}bg-warning text-dark
+              {% else %}bg-dark{% endif %}
+            ">
+              {{ p.get_estatus_display }}
+            </span>
+          </td>
+
+          <td>
+            <a href="{% url 'portal:pago_detail' p.id %}" class="btn btn-sm btn-outline-primary">
+              Ver
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center">No hay pagos disponibles.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+{% endblock %}

@@ -22,6 +22,7 @@ from documentos.models import Documento
 @login_required
 @require_POST
 def pago_marcar_pagado(request, pk):
+    print("[ui/views/pagos]-pago_marcar_pagado")
     pago = get_object_or_404(Pago.objects.select_related("poliza"), pk=pk)
 
     if not can_manage_pago(request.user, pago):
@@ -44,14 +45,16 @@ def pago_marcar_pagado(request, pk):
         pago.metodo = metodo
         pago.referencia = referencia
         pago.fecha_pago = fecha_pago
+        pago.monto_pagado = pago.monto
         pago.estatus = Pago.Estatus.PAGADO
-        pago.save(update_fields=["metodo", "referencia", "fecha_pago", "estatus", "updated_at"])
+        pago.save(update_fields=["metodo", "referencia", "fecha_pago", "monto_pagado", "estatus", "updated_at"])
 
         log_poliza_event(
             poliza=pago.poliza,
             tipo=PolizaEvento.Tipo.PAGO_PAGADO,
             actor=request.user,
-            titulo="Pago marcado como pagado",
+            titulo="Pago confirmado manualmente",
+            detalle=f"Se confirmó manualmente el pago #{pago.id} por {pago.moneda} {pago.monto}.",
             data={
                 "pago_id": pago.id,
                 "fecha_programada": str(pago.fecha_programada),
@@ -59,11 +62,13 @@ def pago_marcar_pagado(request, pk):
                 "metodo": pago.metodo,
                 "referencia": pago.referencia,
                 "monto": str(pago.monto),
+                "moneda": pago.moneda,
+                "origen": "manual",
             },
+            dedupe_key=f"PAGO_PAGADO:{pago.id}",
         )
-
-
-    messages.success(request, "Pago marcado como pagado.")
+            
+    messages.success(request, "Pago confirmado manualmente.")
     return redirect(request.META.get("HTTP_REFERER") or "ui:pago_list")
 
 
@@ -77,7 +82,7 @@ class PagoListView(LoginRequiredMixin, ListView):
         qs = (
             Pago.objects
             .select_related("poliza", "poliza__cliente", "poliza__aseguradora")
-            .order_by("fecha_programada", "-created_at")
+            .order_by("-fecha_programada", "-created_at")
         )
 
         user = self.request.user
@@ -102,6 +107,16 @@ class PagoListView(LoginRequiredMixin, ListView):
 
         if estatus:
             qs = qs.filter(estatus=estatus)
+
+        ultimos = (self.request.GET.get("ultimos") or "").strip()
+        if ultimos:
+            dias = int(ultimos)
+            fecha_inicio = timezone.localdate() - timedelta(days=dias)
+
+            qs = qs.filter(
+                estatus=Pago.Estatus.PAGADO,
+                fecha_pago__gte=fecha_inicio
+            )
 
         if desde:
             qs = qs.filter(fecha_programada__gte=desde)
@@ -185,5 +200,26 @@ def pago_comprobante_subir(request, pk):
             },
         )
 
+==
+nuevo
+        log_poliza_event(
+            poliza=pago.poliza,
+            tipo=PolizaEvento.Tipo.PAGO_COMPROBANTE_ADJUNTADO,
+            actor=request.user,
+            titulo="Comprobante de pago adjuntado",
+            detalle=f"Se adjuntó comprobante al pago #{pago.id}.",
+            data={
+                "pago_id": pago.id,
+                "documento_id": pago.comprobante_id,
+                "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
+                "fecha_pago": str(pago.fecha_pago) if pago.fecha_pago else "",
+                "monto": str(pago.monto),
+                "moneda": pago.moneda,
+                "metodo": pago.metodo,
+                "referencia": pago.referencia,
+            },
+            dedupe_key=f"PAGO_COMPROBANTE_ADJUNTADO:{pago.id}:{pago.comprobante_id}",
+        )
+==
     messages.success(request, "Comprobante adjuntado correctamente.")
     return redirect("ui:pago_list")

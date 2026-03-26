@@ -1,0 +1,101 @@
+{% extends "portal/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h3 class="mb-3">Detalle de Pago #{{ pago.id }}</h3>
+
+  <!-- INFO -->
+  <div class="card mb-3">
+    <div class="card-body">
+
+      <p><strong>Concepto:</strong> {{ pago.concepto }}</p>
+
+      <p><strong>Póliza:</strong>
+        {% if pago.poliza %}
+          {{ pago.poliza.numero_poliza }}
+        {% else %}
+          -
+        {% endif %}
+      </p>
+
+      <p><strong>Monto:</strong> ${{ pago.monto|floatformat:2|intcomma }}</p>
+
+      <p><strong>Monto pagado:</strong>
+        {% if pago.monto_pagado %}
+          ${{ pago.monto_pagado|floatformat:2|intcomma }}
+        {% else %}
+          -
+        {% endif %}
+      </p>
+
+      <p><strong>Estatus:</strong>
+        <span class="badge bg-primary">{{ pago.get_estatus_display }}</span>
+      </p>
+
+      <p><strong>Vencimiento:</strong> {{ pago.fecha_vencimiento }}</p>
+
+      {% if pago.metodo %}
+        <p><strong>Método:</strong> {{ pago.metodo }}</p>
+      {% endif %}
+
+      {% if pago.referencia %}
+        <p><strong>Referencia:</strong> {{ pago.referencia }}</p>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- BOTÓN PAGAR -->
+  {% if pago.puede_generar_checkout %}
+  <form method="post" action="{% url 'portal:pago_checkout' pago.id %}">
+    {% csrf_token %}
+    <button class="btn btn-success btn-lg">
+      Pagar ahora
+    </button>
+  </form>
+  {% endif %}
+
+  <!-- TRANSACCIONES -->
+  <div class="mt-4">
+    <h5>Historial</h5>
+
+    <table class="table table-sm table-bordered">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Provider</th>
+          <th>Estatus</th>
+          <th>Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transacciones %}
+        <tr>
+          <td>{{ t.created_at }}</td>
+          <td>{{ t.get_tipo_display }}</td>
+          <td>{{ t.provider }}</td>
+          <td>{{ t.provider_status }}</td>
+          <td>
+            {% if t.monto %}
+              ${{ t.monto|floatformat:2 }}
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center">Sin movimientos</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <a href="{% url 'portal:pago_list' %}" class="btn btn-secondary mt-3">
+    Volver
+  </a>
+
+</div>
+{% endblock %}

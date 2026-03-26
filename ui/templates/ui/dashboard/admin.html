@@ -1,0 +1,295 @@
+{% extends "ui/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<style>
+  .dashboard-card-link {
+    text-decoration: none;
+    color: inherit;
+  }
+  .dashboard-card-link .card {
+    transition: transform .15s ease, box-shadow .15s ease;
+    cursor: pointer;
+  }
+  .dashboard-card-link:hover .card {
+    transform: translateY(-2px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.10);
+  }
+</style>
+
+<div class="container-fluid">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-0">Dashboard Admin</h3>
+      <div class="text-muted small">Fecha: {{ today }}</div>
+    </div>
+  </div>
+
+  <!-- KPIs globales -->
+  <div class="row g-3 mb-4">
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:cliente_list' %}" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Clientes Totales</div>
+                    <div class="fs-3 fw-bold">{{ kpi_global.clientes_total|intcomma }}</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:poliza_list' %}" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pólizas Totales</div>
+                    <div class="fs-3 fw-bold">{{ kpi_global.polizas_total|intcomma }}</div>
+                    <div class="small text-muted">
+                        Vigentes: {{ kpi_global.polizas_vigentes|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:poliza_list' %}?estatus=EN_PROCESO" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pólizas En Proceso</div>
+                    <div class="fs-3 fw-bold text-warning">{{ kpi_global.polizas_en_proceso|intcomma }}</div>
+                    <div class="small text-muted">
+                        Vencidas: {{ kpi_global.polizas_vencidas|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:poliza_list' %}?estatus=CANCELADA" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pólizas Canceladas</div>
+                    <div class="fs-3 fw-bold text-danger">{{ kpi_global.polizas_canceladas|intcomma }}</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:pago_list' %}?estatus=PENDIENTE" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pagos Pendientes</div>
+                    <div class="fs-3 fw-bold">{{ kpi_global.pagos_pendientes|intcomma }}</div>
+                    <div class="small text-muted">
+                        ${{ kpi_global.monto_pendiente|floatformat:2|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:pago_list' %}?estatus=VENCIDO" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Pagos Vencidos</div>
+                    <div class="fs-3 fw-bold text-danger">{{ kpi_global.pagos_vencidos|intcomma }}</div>
+                    <div class="small text-muted">
+                        ${{ kpi_global.monto_vencido|floatformat:2|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                <div class="text-muted small">Cobranza 30 días</div>
+                <div class="fs-3 fw-bold text-success">${{ kpi_global.monto_pagado_30d|floatformat:2|intcomma }}</div>
+                <div class="small text-muted">
+                    Pagos: {{ kpi_global.pagos_pagados_30d|intcomma }}
+                </div>
+            </div>
+        </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'ui:pago_list' %}?estatus=PENDIENTE" class="dashboard-card-link">  <!-- debe ser comision_list -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small">Comisiones Pendientes</div>
+                    <div class="fs-3 fw-bold">{{ kpi_global.comisiones_pendientes|intcomma }}</div>
+                    <div class="small text-muted">
+                        ${{ kpi_global.monto_comisiones_pendientes|floatformat:2|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+  </div>
+
+  <!-- Tablas principales -->
+  <div class="row g-4 mb-4">
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Pólizas próximas a vencer (30 días)</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Vigencia hasta</th>
+                  <th>Póliza</th>
+                  <th>Cliente</th>
+                  <th>Agente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in proximas_polizas %}
+                <tr>
+                  <td>{{ p.vigencia_hasta }}</td>
+                  <td>{{ p.numero_poliza }}</td>
+                  <td>{{ p.cliente }}</td>
+                  <td>{{ p.agente|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-3">Sin pólizas próximas a vencer.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Últimos pagos registrados</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Póliza</th>
+                  <th>Cliente</th>
+                  <th>Fecha programada</th>
+                  <th>Estatus</th>
+                  <th class="text-end">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in ultimos_pagos %}
+                <tr>
+                  <td>{{ p.poliza.numero_poliza }}</td>
+                  <td>{{ p.poliza.cliente }}</td>
+                  <td>{{ p.fecha_programada }}</td>
+                  <td>{{ p.get_estatus_display }}</td>
+                  <td class="text-end">${{ p.monto|floatformat:2|intcomma }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">Sin pagos registrados.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Últimas pólizas + eventos -->
+  <div class="row g-4">
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Últimas pólizas</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>No. póliza</th>
+                  <th>Cliente</th>
+                  <th>Aseguradora</th>
+                  <th>Agente</th>
+                  <th>Estatus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in ultimas_polizas %}
+                <tr>
+                  <td>{{ p.numero_poliza }}</td>
+                  <td>{{ p.cliente }}</td>
+                  <td>{{ p.aseguradora }}</td>
+                  <td>{{ p.agente|default:"-" }}</td>
+                  <td>{{ p.get_estatus_display }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">Sin pólizas registradas.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Actividad reciente</div>
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            {% for row in eventos_7d %}
+              <div class="col-md-6">
+                <div class="border rounded p-2 d-flex justify-content-between">
+                  <span class="small">{{ row.tipo }}</span>
+                  <span class="fw-semibold">{{ row.total }}</span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin actividad reciente.</div>
+            {% endfor %}
+          </div>
+
+          <div class="small text-muted mb-2">Últimos eventos</div>
+          <div class="list-group list-group-flush">
+            {% for e in ultimos_eventos %}
+              <div class="list-group-item px-0">
+                <div class="d-flex justify-content-between">
+                  <div class="fw-semibold">{{ e.tipo }}</div>
+                  <div class="text-muted small">{{ e.created_at|date:"Y-m-d H:i" }}</div>
+                </div>
+                <div class="small">
+                  Póliza: {{ e.poliza.numero_poliza }}
+                  {% if e.titulo %} · {{ e.titulo }}{% endif %}
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin eventos.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

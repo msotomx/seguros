@@ -10,6 +10,8 @@ from portal.views.api import SubmarcasPorMarcaView, CatalogoPorFiltroView
 from portal.views.cotizar_resumen import PortalCotizarResumenView
 from portal.views.home import AccesoSuspendidoView
 from portal.views.polizas import PortalPolizaListView
+from portal.views.pagos import PortalPagoListView, PortalPagoDetailView
+from portal.views.pagos import PortalPagoCheckoutView, PortalPagoReturnView
 
 app_name = "portal"
 
@@ -27,4 +29,12 @@ urlpatterns = [
     # si cliente no tiene portal_activo
     path("acceso-suspendido/", AccesoSuspendidoView.as_view(), name="acceso_suspendido"),
     path("polizas/", PortalPolizaListView.as_view(), name="poliza_list"),
+    # ============================
+    # PAGOS (PORTAL CLIENTE)
+    # ============================
+    path("pagos/", PortalPagoListView.as_view(), name="pago_list"),
+    path("pagos/<int:pk>/", PortalPagoDetailView.as_view(), name="pago_detail"),
+    path("pagos/<int:pk>/checkout/", PortalPagoCheckoutView.as_view(), name="pago_checkout"),
+    # retorno del checkout (MercadoPago)
+    path("pagos/return/<str:status>/", PortalPagoReturnView.as_view(), name="pago_return"),
 ]

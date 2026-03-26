@@ -33,11 +33,43 @@ def _extract_headers(request) -> dict:
     ]
     return {k: request.META.get(k) for k in keep if request.META.get(k) is not None}
 
-from django.db.models import F
 
 import json
+
+from django.db import transaction
+from django.db.models import F
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseNotAllowed
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+
+from integrations.models import IntegrationEvent
+from integrations.providers import get_provider
+from integrations.providers.base import ProviderBusinessIgnore
+
+
+def _pick_headers(request) -> dict:
+    """
+    Guardamos subset útil (evita almacenar TODO por privacidad/ruido).
+    Django expone headers como request.headers (case-insensitive).
+    """
+
+    keys = [
+        "x-signature",
+        "x-request-id",
+        "user-agent",
+        "content-type",
+        "x-forwarded-for",
+        "x-forwarded-proto",
+        "host",
+        "referer",
+        "traceparent",
+    ]
+    out = {}
+    for k in keys:
+        v = request.headers.get(k)
+        if v:
+            out[k] = v
+    return out
 
 
 @csrf_exempt
@@ -49,72 +81,87 @@ def webhook_in(request, provider: str):
     if not prov:
         return HttpResponseBadRequest("Unknown provider")
 
-    raw_body = request.body or b""
+    raw_body_bytes = request.body or b""
+    raw_body_text = raw_body_bytes.decode("utf-8", errors="replace") if raw_body_bytes else ""
 
-    # 1) Validación de firma
-    # (para MercadoPago a veces depende de headers + query params)
-    if not prov.validate_signature(request, raw_body):
+    # 1) Validar firma
+    if not prov.validate_signature(request, raw_body_bytes):
         return JsonResponse({"ok": False, "error": "invalid_signature"}, status=401)
 
-    # 2) Parse JSON si se puede; si no, continuar (NO 400)
+    # 2) payload
+    #    Parse JSON (si no es JSON, payload=None pero raw_body sí se guarda)
     payload = None
-    if raw_body.strip():
+    if raw_body_text.strip():
         try:
-            payload = json.loads(raw_body.decode("utf-8"))
+            payload = json.loads(raw_body_text)
         except Exception:
-            payload = None  # <- clave: no fallar
+            payload = None
 
-    # 3) Normaliza evento (debe soportar payload None)
-    normalized = prov.normalize_event(payload, request=request)
-    event_id = str(normalized["event_id"])
-    event_type = normalized.get("event_type", "")
-    dedupe_key = normalized.get("dedupe_key")  # opcional
-    obj_type = normalized.get("object_type", "")
-    obj_id = normalized.get("object_id", "")
+    # 3) Normalizar (debe sacar event_id aunque payload sea None, usando query params)
+    try:
+        normalized = prov.normalize_event(payload, request=request)
+    except ProviderBusinessIgnore as e:
+        # Evento válido pero no procesable (ej. falta data.id)
+        # Respondemos 200 para que no reintente
+        return JsonResponse({"ok": True, "ignored": True, "reason": str(e)})
 
-    # 4) Idempotencia: registrar IntegrationEvent
+    event_id = str(normalized.get("event_id") or "").strip()
+    event_type = normalized.get("event_type", "") or ""
+    dedupe_key = normalized.get("dedupe_key")
+    object_type = normalized.get("object_type", "") or ""
+    object_id = normalized.get("object_id", "") or ""
+
+    if not event_id:
+        return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
+
+    # headers relevantes
+    headers_subset = _pick_headers(request)
+    signature = request.headers.get("x-signature", "") or ""
+
+    # 4) IntegrationEvent
+    # Idempotencia (provider + event_id)
+    # Guardamos SIEMPRE el evento recibido, sin procesar todavía
     try:
         with transaction.atomic():
             ie, created = IntegrationEvent.objects.get_or_create(
                 provider=provider,
-                event_id=event_id,  # OJO: tu modelo se llama event_id
+                event_id=event_id,
                 defaults={
                     "event_type": event_type,
+                    "signature": signature,
+                    "headers": headers_subset or None,
                     "payload": payload,
-                    "raw_body": raw_body.decode("utf-8", errors="ignore"),
-                    "headers": {
-                        "x-signature": request.headers.get("x-signature", ""),
-                        "x-request-id": request.headers.get("x-request-id", ""),
-                        "content-type": request.headers.get("content-type", ""),
-                    },
-                    "signature": request.headers.get("x-signature", ""),
+                    "raw_body": raw_body_text[:200000],
                     "status": IntegrationEvent.Status.RECEIVED,
+                    "received_at": timezone.now(),
                     "dedupe_key": dedupe_key,
-                    "object_type": obj_type,
-                    "object_id": str(obj_id),
+                    "object_type": object_type,
+                    "object_id": object_id,
                 },
             )
     except Exception:
-        # carrera por unique constraint
         created = False
-        ie = IntegrationEvent.objects.filter(provider=provider, event_id=event_id).first()
+        ie = IntegrationEvent.objects.filter(provider=provider, event_id=event_id).order_by("-id").first()
 
-    # incrementa attempts SIEMPRE (creado o deduped)
-    IntegrationEvent.objects.filter(provider=provider, event_id=event_id).update(
+    if not created:
+        # Ya existe; responder 200 para que el provider deje de reintentar        
+        return JsonResponse({"ok": True, "deduped": True})
+
+    # attempts, Incrementar attempts ANTES de procesar
+    IntegrationEvent.objects.filter(id=ie.id).update(
         attempts=F("attempts") + 1,
         last_attempt_at=timezone.now(),
     )
-
-    if not created:
-        return JsonResponse({"ok": True, "deduped": True})
 
     # 5) Procesar
     try:
         with transaction.atomic():
             prov.process(normalized)
+
             ie.status = IntegrationEvent.Status.PROCESSED
             ie.processed_at = timezone.now()
-            ie.save(update_fields=["status", "processed_at"])
+            ie.error_message = ""
+            ie.save(update_fields=["status", "processed_at", "error_message"])
 
     except ProviderBusinessIgnore as e:
         ie.status = IntegrationEvent.Status.IGNORED
@@ -124,18 +171,10 @@ def webhook_in(request, provider: str):
         return JsonResponse({"ok": True, "ignored": True})
 
     except Exception as e:
-        msg = str(e)
-
-        # Si el provider da un error tipo "Payment not found" o status=404 -> IGNORED
-        if "status=404" in msg or "Payment not found" in msg:
-            ie.status = IntegrationEvent.Status.IGNORED
-            ie.error_message = msg[:4000]
-            ie.processed_at = timezone.now()
-            ie.save(update_fields=["status", "error_message", "processed_at"])
-            return JsonResponse({"ok": True, "ignored": True})
-
         ie.status = IntegrationEvent.Status.ERROR
-        ie.error_message = msg[:4000]
+        ie.error_message = str(e)[:4000]
         ie.processed_at = timezone.now()
         ie.save(update_fields=["status", "error_message", "processed_at"])
         return JsonResponse({"ok": False, "error": "processing_failed"}, status=500)
+
+    return JsonResponse({"ok": True})

@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     DashboardView,
+    BasicDashboardView,
     AgenteDashboardView,
     SupervisorDashboardView,
     AdminDashboardView,
@@ -41,6 +42,7 @@ app_name = "ui"
 urlpatterns = [
     # ✅ Dashboard principal
     path("", DashboardView.as_view(), name="dashboard"),
+    path("dashboard/basic/", BasicDashboardView.as_view(), name="dashboard_basic"),
     # Dashboard por rol
     path("dashboard/agente/", AgenteDashboardView.as_view(), name="dashboard_agente"),
     path("dashboard/supervisor/", SupervisorDashboardView.as_view(), name="dashboard_supervisor"),
@@ -86,6 +88,4 @@ urlpatterns = [
     # Documentos
     path("polizas/<int:pk>/documento/subir/", poliza_documento_subir, name="poliza_documento_subir"),
     path("pagos/<int:pk>/comprobante/subir/", pago_comprobante_subir, name="pago_comprobante_subir"),
-
-
 ]

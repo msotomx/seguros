@@ -1,61 +1,89 @@
+{% load group_tags %}
+
 <ul class="nav nav-pills flex-column gap-1">
+
+  <!-- Inicio -->
   <li class="nav-item">
     <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
-       href="{% url 'ui:dashboard' %}">Dashboard
+       href="{% url 'ui:dashboard' %}">
+      Inicio
     </a>
   </li>
 
-  {% if perms.crm.view_cliente %}
-  <li class="nav-item">
-    <a class="nav-link {% if 'cliente_' in request.resolver_match.url_name %}active{% endif %}"
-      href="{% url 'ui:cliente_list' %}">
-      Clientes
-    </a>
-  </li>
-  {% endif %}
+  <!-- Agente / Supervisor / Admin -->
+  {% if request.user|has_group:"Agente" or request.user|has_group:"Supervisor" or request.user|has_group:"Admin" or request.user.is_superuser %}
 
-  {% if perms.autos.view_vehiculo %}
-  <li class="nav-item">
-    <a class="nav-link" href="/admin/autos/vehiculo/">Vehículos</a>
-  </li>
-  {% endif %}
+    <li class="nav-item mt-3">
+      <div class="text-uppercase text-muted small fw-bold px-2">Operación</div>
+    </li>
 
-  {% if perms.cotizador.view_cotizacion %}
-  <li class="nav-item">
-      <a class="nav-link {% if 'cotizacion_' in request.resolver_match.url_name %}active{% endif %}"
-        href="{% url 'ui:cotizacion_list' %}">
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_agente' %}active{% endif %}"
+         href="{% url 'ui:dashboard_agente' %}">
+        Dashboard Agente
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link"
+         href="{% url 'ui:cliente_list' %}"> <!--  crm:cliente_list -->
+        Clientes
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link"
+         href="{% url 'ui:cotizacion_list' %}">
         Cotizaciones
       </a>
-  </li>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link"
+         href="{% url 'ui:poliza_list' %}">
+        Pólizas
+      </a>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link"
+         href="{% url 'ui:pago_list' %}">
+        Pagos
+      </a>
+    </li>
+
   {% endif %}
 
-  {% if perms.polizas.manage_polizas %}
-  <li class="nav-item">
-    <a class="nav-link
-      {% if 'poliza_' in request.resolver_match.url_name %}
-        active
-      {% endif %}"
-      href="{% url 'ui:poliza_list' %}">
-      Pólizas
-    </a>
-  </li>
+  <!-- Supervisor -->
+  {% if request.user|has_group:"Supervisor" or request.user|has_group:"Admin" or request.user.is_superuser %}
+
+    <li class="nav-item mt-3">
+      <div class="text-uppercase text-muted small fw-bold px-2">Supervisión</div>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_supervisor' %}active{% endif %}"
+         href="{% url 'ui:dashboard_supervisor' %}">
+        Dashboard Supervisor
+      </a>
+    </li>
+
   {% endif %}
 
-  {% if perms.finanzas.view_pago %}
-  <li class="nav-item">
-    <a class="nav-link
-      {% if 'pago_' in request.resolver_match.url_name %}
-        active
-      {% endif %}"
-      href="{% url 'ui:pago_list' %}">
-      Pagos
-    </a>
-  </li>
+  <!-- Admin -->
+  {% if request.user|has_group:"Admin" or request.user.is_superuser %}
+
+    <li class="nav-item mt-3">
+      <div class="text-uppercase text-muted small fw-bold px-2">Administración</div>
+    </li>
+
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.url_name == 'dashboard_admin' %}active{% endif %}"
+         href="{% url 'ui:dashboard_admin' %}">
+        Dashboard Admin
+      </a>
+    </li>
+
   {% endif %}
 
-  {% if perms.tarifas.view_reglatarifa %}
-  <li class="nav-item">
-    <a class="nav-link" href="/admin/tarifas/reglatarifa/">Tarifas (Reglas)</a>
-  </li>
-  {% endif %}
 </ul>

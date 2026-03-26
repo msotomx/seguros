@@ -1,8 +1,5 @@
-from .dashboard import DashboardView
-
-from .agente import AgenteDashboardView
-from .supervisor import SupervisorDashboardView
-from .admin import AdminDashboardView
+from .dashboard import DashboardView, BasicDashboardView, AgenteDashboardView
+from .dashboard import SupervisorDashboardView, AdminDashboardView
 
 from .cotizaciones import (
     CotizacionListView,
@@ -33,6 +30,7 @@ from ui.views.comisiones import ComisionListView, comision_marcar_pagada
 
 __all__ = [
     "DashboardView",
+    "BasicDashboardView",
     "CotizacionListView",
     "CotizacionDetailView",
     "cotizacion_select_item",

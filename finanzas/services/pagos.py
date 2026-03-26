@@ -71,6 +71,7 @@ def crear_plan_pagos(poliza: Poliza, *, overwrite=False):
 
             Pago.objects.create(
                 poliza=poliza,
+                cliente=poliza.cliente,
                 fecha_programada=fecha,
                 monto=monto,
                 estatus=Pago.Estatus.PENDIENTE,

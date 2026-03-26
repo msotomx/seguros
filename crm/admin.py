@@ -40,6 +40,7 @@ class ClienteAdmin(admin.ModelAdmin):
         "telefono_principal",
         "origen",
     )
+ 
     list_filter = ("tipo_cliente", "estatus", "is_active", "origen", "created_at")
     autocomplete_fields = ("owner", "direccion_fiscal", "direccion_contacto")
     list_select_related = ("owner", "direccion_fiscal", "direccion_contacto")

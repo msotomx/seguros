@@ -1,0 +1,188 @@
+{% extends "ui/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h3 class="mb-0">Dashboard Supervisor</h3>
+      <div class="text-muted small">Actualizado: {{ today }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{% url 'ui:dashboard_supervisor' %}">
+        <i class="bi bi-arrow-clockwise"></i> Refrescar
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <div class="text-muted small">Pólizas Vigentes</div>
+              <div class="fs-3 fw-semibold">{{ polizas_kpi.vigentes|intcomma }}</div>
+            </div>
+            <div class="fs-2 text-success"><i class="bi bi-shield-check"></i></div>
+          </div>
+          <div class="small text-muted mt-2">
+            En proceso: {{ polizas_kpi.en_proceso|intcomma }} · Vencidas: {{ polizas_kpi.vencidas|intcomma }} · Canceladas: {{ polizas_kpi.canceladas|intcomma }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <div class="text-muted small">Pagos Pendientes</div>
+              <div class="fs-3 fw-semibold">{{ pagos_kpi.pendientes|intcomma }}</div>
+            </div>
+            <div class="fs-2 text-primary"><i class="bi bi-cash-coin"></i></div>
+          </div>
+          <div class="small text-muted mt-2">
+            Monto pendiente: ${{ pagos_kpi.monto_pendiente|floatformat:2|intcomma }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <div class="text-muted small">Pagos Vencidos</div>
+              <div class="fs-3 fw-semibold">{{ pagos_kpi.vencidos|intcomma }}</div>
+            </div>
+            <div class="fs-2 text-danger"><i class="bi bi-exclamation-triangle"></i></div>
+          </div>
+          <div class="small text-muted mt-2">
+            Monto vencido: ${{ pagos_kpi.monto_vencido|floatformat:2|intcomma }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between">
+            <div>
+              <div class="text-muted small">Comisiones Pendientes</div>
+              <div class="fs-3 fw-semibold">{{ comisiones_kpi.pendientes|intcomma }}</div>
+            </div>
+            <div class="fs-2 text-warning"><i class="bi bi-percent"></i></div>
+          </div>
+          <div class="small text-muted mt-2">
+            Monto pendiente: ${{ comisiones_kpi.monto_pendiente|floatformat:2|intcomma }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tablas -->
+  <div class="row g-3">
+    <div class="col-12 col-xl-7">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Pagos próximos a vencer (7 días)</div>
+          <span class="badge text-bg-light">Top 15</span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Póliza</th>
+                  <th>Cliente</th>
+                  <th class="text-end">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pago in proximos_vencer %}
+                  <tr>
+                    <td>{{ pago.fecha_programada }}</td>
+                    <td>{{ pago.poliza.numero_poliza }}</td>
+                    <td>{{ pago.poliza.cliente }}</td>
+                    <td class="text-end">${{ pago.monto|floatformat:2|intcomma }}</td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center text-muted py-4">No hay pagos próximos a vencer.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-white fw-semibold">Actividad últimos 7 días</div>
+        <div class="card-body">
+          <div class="row g-2">
+            {% for row in eventos_7d %}
+              <div class="col-12 col-md-6 col-xl-4">
+                <div class="border rounded p-2 d-flex justify-content-between">
+                  <span class="small text-muted">{{ row.tipo }}</span>
+                  <span class="fw-semibold">{{ row.total }}</span>
+                </div>
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin actividad registrada.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="col-12 col-xl-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex align-items-center justify-content-between">
+          <div class="fw-semibold">Bitácora (últimos 20)</div>
+          <span class="badge text-bg-light">Eventos</span>
+        </div>
+        <div class="card-body">
+          <div class="vstack gap-3">
+            {% for e in eventos %}
+              <div class="border rounded p-2">
+                <div class="d-flex justify-content-between">
+                  <div class="fw-semibold">{{ e.tipo }}</div>
+                  <div class="text-muted small">{{ e.created_at|date:"Y-m-d H:i" }}</div>
+                </div>
+                <div class="small text-muted">
+                  Póliza: <span class="fw-semibold">{{ e.poliza.numero_poliza }}</span>
+                  {% if e.actor %} · Actor: {{ e.actor }}{% endif %}
+                </div>
+                {% if e.titulo %}
+                  <div class="mt-1">{{ e.titulo }}</div>
+                {% endif %}
+                {% if e.detalle %}
+                  <div class="small text-muted mt-1">{{ e.detalle }}</div>
+                {% endif %}
+                {% if e.dedupe_key %}
+                  <div class="small text-muted mt-1">
+                    <code>{{ e.dedupe_key }}</code>
+                  </div>
+                {% endif %}
+              </div>
+            {% empty %}
+              <div class="text-muted">Sin eventos.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

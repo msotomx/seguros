@@ -81,7 +81,7 @@ class Command(BaseCommand):
                     titulo="Póliza vencida automáticamente",
                     detalle=f"Vigencia hasta {poliza.vigencia_hasta}",
                     data={"vigencia_hasta": str(poliza.vigencia_hasta)},
-                    dedupe_key=f"POLIZA_VENCIDA:{poliza.id}",
+                    dedupe_key=f"POLIZA_VENCIDA:{poliza.id}:{poliza.vigencia_hasta}",
                 )
 
         self.stdout.write(self.style.SUCCESS(

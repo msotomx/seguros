@@ -653,9 +653,9 @@
 
                     <div class="text-muted small">
                         {% if e.actor %}
-                        Por: {{ e.actor.get_full_name|default:e.actor.username }}
+                        Por: {{ e.actor.get_full_name|default:e.actor.username }} • {{e.titulo|default:e.get_tipo_display}}
                         {% else %}
-                        Por: Sistema
+                        Por: {{e.titulo|default:e.get_tipo_display}}
                         {% endif %}
                         • <span class="badge bg-light text-dark">{{ e.get_tipo_display }}</span>
                     </div>

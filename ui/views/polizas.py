@@ -266,64 +266,6 @@ def poliza_actualizar_numero(request, pk):
 
 @login_required
 @require_POST
-def poliza_actualizar_numero2(request, pk):
-    poliza = get_object_or_404(Poliza.objects.select_related("aseguradora"), pk=pk)
-
-    # Permisos / alcance 
-    if not can_manage_poliza(request.user, poliza):
-        messages.error(request, "No tienes permisos para realizar esta acción.")
-        return redirect("ui:poliza_detail", pk=poliza.pk)
-
-    # Regla: solo permitir capturar/editar número cuando está EN_PROCESO
-    if poliza.estatus != Poliza.Estatus.EN_PROCESO:
-        messages.error(request, "Solo puedes cambiar el número cuando la póliza está en proceso.")
-        return redirect("ui:poliza_detail", pk=poliza.pk)
-
-    numero = (request.POST.get("numero_poliza") or "").strip()
-
-    if not numero:
-        messages.error(request, "Captura el número real de póliza.")
-        return redirect("ui:poliza_detail", pk=poliza.pk)
-
-    if numero.startswith("TEMP-"):
-        messages.error(request, "El número real no puede iniciar con TEMP-.")
-        return redirect("ui:poliza_detail", pk=poliza.pk)
-
-    # (Opcional) normalizar: quitar espacios internos dobles, etc.
-    # numero = " ".join(numero.split())
-
-    try:
-        with transaction.atomic():
-            poliza.numero_poliza = numero
-            poliza.save()  # respeta updated_at
-
-            # Actualizar Bitacora de Eventos
-            old = poliza.numero_poliza
-            poliza.numero_poliza = numero
-            poliza.save()
-
-            log_poliza_event(
-                poliza=poliza,
-                tipo=PolizaEvento.Tipo.NUMERO_ACTUALIZADO,
-                actor=request.user,
-                titulo="Número de póliza actualizado",
-                data={"antes": old, "despues": numero},
-            )
-
-    except IntegrityError:
-        # Por tu UniqueConstraint: (aseguradora, numero_poliza)
-        messages.error(
-            request,
-            f"Ya existe una póliza con ese número para {poliza.aseguradora.nombre}."
-        )
-        return redirect("ui:poliza_detail", pk=poliza.pk)
-
-    messages.success(request, "Número de póliza actualizado.")
-    return redirect("ui:poliza_detail", pk=poliza.pk)
-
-
-@login_required
-@require_POST
 def poliza_cancelar(request, pk):
     poliza = get_object_or_404(Poliza, pk=pk)
 

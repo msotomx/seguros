@@ -20,3 +20,4 @@ def get_provider(slug: str) -> Optional[object]:
     if not slug:
         return None
     return _PROVIDERS.get(slug.lower())
+

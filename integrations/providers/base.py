@@ -37,3 +37,28 @@ class BaseProvider:
         h = hashlib.sha256(raw_body or b"").hexdigest()
         return f"bodysha256:{h}"
     
+
+class ProviderBusinessIgnore(Exception):
+    """
+    Excepción para indicar que el webhook fue recibido correctamente,
+    pero el evento no aplica a nuestro sistema y debe ignorarse.
+
+    Ejemplos de uso:
+    - Payment no encontrado en MercadoPago (404)
+    - Payment sin external_reference válido
+    - Evento duplicado
+    - Status que no nos interesa procesar
+
+    Cuando esta excepción es lanzada, el webhook debe responder HTTP 200
+    y marcar el IntegrationEvent como IGNORED.
+    """
+
+    def __init__(self, message: str = "", *, code: str = ""):
+        super().__init__(message)
+        self.message = message
+        self.code = code  # opcional, por si quieres clasificar tipos
+
+    def __str__(self):
+        if self.code:
+            return f"[{self.code}] {self.message}"
+        return self.message

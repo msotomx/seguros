@@ -16,55 +16,9 @@ from finanzas.models import Pago
 from polizas.models import PolizaEvento
 from polizas.services import log_poliza_event
 
+from integrations.providers.base import ProviderBusinessIgnore
 
-def _parse_x_signature(x_signature: str) -> Tuple[Optional[str], Optional[str]]:
-    if not x_signature:
-        return None, None
-    ts = None
-    v1 = None
-    parts = [p.strip() for p in x_signature.split(",") if p.strip()]
-    for p in parts:
-        if p.startswith("ts="):
-            ts = p.split("=", 1)[1].strip()
-        elif p.startswith("v1="):
-            v1 = p.split("=", 1)[1].strip()
-    return ts, v1
-
-
-def _get_query_param(request, key: str) -> str:
-    full = request.get_full_path()
-    qs = urlparse(full).query
-    params = parse_qs(qs)
-    return (params.get(key, [""])[0] or "").strip()
-
-
-class ProviderBusinessIgnore(Exception):
-    """
-    Excepción para indicar que el webhook fue recibido correctamente,
-    pero el evento no aplica a nuestro sistema y debe ignorarse.
-
-    Ejemplos de uso:
-    - Payment no encontrado en MercadoPago (404)
-    - Payment sin external_reference válido
-    - Evento duplicado
-    - Status que no nos interesa procesar
-
-    Cuando esta excepción es lanzada, el webhook debe responder HTTP 200
-    y marcar el IntegrationEvent como IGNORED.
-    """
-
-    def __init__(self, message: str = "", *, code: str = ""):
-        super().__init__(message)
-        self.message = message
-        self.code = code  # opcional, por si quieres clasificar tipos
-
-    def __str__(self):
-        if self.code:
-            return f"[{self.code}] {self.message}"
-        return self.message
     
-
-
 class MercadoPagoProvider:
     """
     Provider MercadoPago (webhooks).
@@ -77,16 +31,72 @@ class MercadoPagoProvider:
 
     API_BASE = "https://api.mercadopago.com"
 
-    def __init__(self, *, access_token: str | None = None):
+    def __init__(self, *, access_token=None, webhook_secret=None):
         self.access_token = access_token or os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
+        self.webhook_secret = webhook_secret or os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
 
-    # ---------------------------------------------------------------------
-    # (Opcional) Firma - en DEV puedes regresar True siempre
-    # ---------------------------------------------------------------------
+    def _parse_x_signature(self, x_signature: str):
+        """
+        x-signature ejemplo:
+        ts=1704908010,v1=618c85345248dd820d5fd456117c2ab2ef8eda45a0282ff693eac24131a5e839
+        """
+        ts = None
+        v1 = None
+
+        if not x_signature:
+            return ts, v1
+
+        parts = [p.strip() for p in x_signature.split(",") if p.strip()]
+        for p in parts:
+            if p.startswith("ts="):
+                ts = p.split("=", 1)[1].strip()
+            elif p.startswith("v1="):
+                v1 = p.split("=", 1)[1].strip()
+
+        return ts, v1
+
+    def _get_query_param(self, request, key: str) -> str:
+        # request.GET también sirve, pero así queda consistente
+        full_path = request.get_full_path()
+        query = urlparse(full_path).query
+        params = parse_qs(query)
+        return (params.get(key, [""])[0] or "").strip()
+
     def validate_signature(self, request, raw_body: bytes) -> bool:
-        # TODO: implementar validación real con x-signature + x-request-id + webhook secret
-        # Por ahora dejamos True para destrabar el flujo.
-        return True
+        """
+        Validación de firma MercadoPago.
+        Si MP_VALIDATE_SIGNATURE=False, no valida (modo DEV).
+        """
+
+        # 🔧 DEV: permitir saltar validación
+        if not settings.MP_VALIDATE_SIGNATURE:
+            return True
+
+        secret = self.webhook_secret
+        if not secret:
+            return False
+
+        x_signature = request.headers.get("x-signature", "") or ""
+        x_request_id = request.headers.get("x-request-id", "") or ""
+        data_id = self._get_query_param(request, "data.id")
+
+        ts, v1 = self._parse_x_signature(x_signature)
+
+        if not (ts and v1 and x_request_id and data_id):
+            return False
+
+        # Mercado Pago recomienda lower() si data.id es alfanumérico
+        data_id = data_id.lower()
+
+        signed_template = f"id:{data_id};request-id:{x_request_id};ts:{ts};"
+
+        generated = hmac.new(
+            key=secret.encode("utf-8"),
+            msg=signed_template.encode("utf-8"),
+            digestmod=hashlib.sha256,
+        ).hexdigest()
+
+        return hmac.compare_digest(generated, v1)    
 
     # ---------------------------------------------------------------------
     # Normalización: sacar payment_id desde query params o payload
@@ -253,4 +263,15 @@ class MercadoPagoProvider:
                 "payment_method_id": mp_payment.get("payment_method_id"),
             },
         )
-        
+
+import mercadopago
+from django.conf import settings
+
+
+class MercadoPagoPaymentProvider:
+    def __init__(self):
+        self.sdk = mercadopago.SDK(settings.MERCADOPAGO_ACCESS_TOKEN)
+
+    def obtener_pago(self, payment_id):
+        response = self.sdk.payment().get(payment_id)
+        return response.get("response", {}) if isinstance(response, dict) else {}
