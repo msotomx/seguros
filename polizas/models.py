@@ -181,7 +181,7 @@ class PolizaEvento(models.Model):
         PAGO_COMPROBANTE_ADJUNTADO = "PAGO_COMPROBANTE_ADJUNTADO", "Comprobante de pago adjuntado"
         POLIZA_DOCUMENTO_ADJUNTADO = "POLIZA_DOCUMENTO_ADJUNTADO", "Documento de póliza adjuntado"
         POLIZA_VENCIDA = "POLIZA_VENCIDA", "Póliza Vencida"
-        
+        PAGO_COMPROBANTE_REEMPLAZADO = "PAGO_COMPROBANTE_REEMPLAZADO", "Comprobante reemplazado"
 
     poliza = models.ForeignKey("polizas.Poliza", on_delete=models.CASCADE, related_name="eventos")
     tipo = models.CharField(max_length=40, choices=Tipo.choices, db_index=True)

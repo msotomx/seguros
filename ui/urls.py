@@ -35,6 +35,8 @@ from .views import (
     comision_marcar_pagada,
     poliza_documento_subir,
     pago_comprobante_subir,
+    CarteraVencidaListView,
+    PagosPorVencerListView,
 )
 
 app_name = "ui"
@@ -88,4 +90,7 @@ urlpatterns = [
     # Documentos
     path("polizas/<int:pk>/documento/subir/", poliza_documento_subir, name="poliza_documento_subir"),
     path("pagos/<int:pk>/comprobante/subir/", pago_comprobante_subir, name="pago_comprobante_subir"),
+    # Cobranza
+    path("cobranza/cartera-vencida/", CarteraVencidaListView.as_view(), name="cartera_vencida"),
+    path("cobranza/pagos-por-vencer/", PagosPorVencerListView.as_view(), name="pagos_por_vencer"),
 ]

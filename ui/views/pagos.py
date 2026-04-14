@@ -14,7 +14,7 @@ from django.utils.dateparse import parse_date
 
 from polizas.models import PolizaEvento
 from polizas.services import log_poliza_event
-from ui.services.perms import can_manage_pago, can_see_pagos
+from ui.services.perms import can_manage_pago, can_see_pagos, pagos_visibles_para_usuario
 from finanzas.models import Pago
 from documentos.models import Documento
 
@@ -22,7 +22,6 @@ from documentos.models import Documento
 @login_required
 @require_POST
 def pago_marcar_pagado(request, pk):
-    print("[ui/views/pagos]-pago_marcar_pagado")
     pago = get_object_or_404(Pago.objects.select_related("poliza"), pk=pk)
 
     if not can_manage_pago(request.user, pago):
@@ -81,15 +80,11 @@ class PagoListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         qs = (
             Pago.objects
-            .select_related("poliza", "poliza__cliente", "poliza__aseguradora")
-            .order_by("-fecha_programada", "-created_at")
+            .select_related("poliza", "cliente", "comprobante")
+            .order_by("-fecha_programada", "-id")
         )
 
-        user = self.request.user
-        # Alcance: agente ve sus pólizas; supervisor/admin ve todo
-
-        if not can_see_pagos(user):
-            qs = qs.filter(poliza__agente=user)
+        qs = pagos_visibles_para_usuario(self.request.user, qs)
 
         # Filtros
         q = (self.request.GET.get("q") or "").strip()
@@ -126,7 +121,9 @@ class PagoListView(LoginRequiredMixin, ListView):
 
         # Auto “Vencido” (opcional visual, sin guardar): solo filtra si lo pides
         # Nota: lo correcto es tener un job que marque vencidos.
+
         return qs
+
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -138,88 +135,120 @@ class PagoListView(LoginRequiredMixin, ListView):
         }
         ctx["estatus_choices"] = Pago.Estatus.choices
         ctx["can_see_pagos"] = can_see_pagos(self.request.user)
-        
+                
         return ctx
+
+from ui.services.validar import validar_archivo_comprobante
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect
+from django.views.decorators.http import require_POST
+
+from documentos.models import Documento
+from finanzas.models import Pago
+from polizas.models import PolizaEvento
+from polizas.services import log_poliza_event
+
+
+def detectar_tipo_documento(uploaded_file):
+    content_type = (uploaded_file.content_type or "").lower()
+
+    if content_type == "application/pdf":
+        return Documento.Tipo.PDF
+
+    if content_type in {"image/jpeg", "image/png"}:
+        return Documento.Tipo.IMG
+
+    return Documento.Tipo.OTRO
+
 
 @login_required
 @require_POST
 def pago_comprobante_subir(request, pk):
-    pago = get_object_or_404(Pago.objects.select_related("poliza"), pk=pk)
+    pago = get_object_or_404(
+        Pago.objects.select_related("poliza", "cliente", "comprobante"),
+        pk=pk,
+    )
 
     # Permisos: Admin/Supervisor (finanzas) o agente dueño de la póliza
-    if not (can_manage_pago(request.user, pago) or pago.poliza.agente_id == request.user.id):
+    if not can_manage_pago(request.user, pago):
         messages.error(request, "No tienes permisos para adjuntar comprobante a este pago.")
-        return redirect("ui:pago_list")
+        return redirect(request.META.get("HTTP_REFERER") or "ui:pago_list")
 
     archivo = request.FILES.get("archivo")
-    if not archivo:
-        messages.error(request, "Selecciona un archivo para subir.")
-        return redirect("ui:pago_list")
 
-    # Permitir PDF e imágenes (jpg/png)
-    ok_types = {"application/pdf", "image/jpeg", "image/png"}
-    ctype = (archivo.content_type or "").lower()
-    if ctype and ctype not in ok_types:
-        messages.error(request, "Solo se permite PDF, JPG o PNG.")
-        return redirect("ui:pago_list")
+    try:
+        validar_archivo_comprobante(archivo)
+    except ValidationError as exc:
+        messages.success(request, str(exc))  # exc.message
+        return redirect(request.META.get("HTTP_REFERER") or "ui:pago_list")
 
-    # Tipo Documento
-    if ctype == "application/pdf" or archivo.name.lower().endswith(".pdf"):
-        tipo = Documento.Tipo.PDF
-    elif archivo.name.lower().endswith((".jpg", ".jpeg", ".png")):
-        tipo = Documento.Tipo.IMG
-    else:
-        tipo = Documento.Tipo.OTRO
+    comprobante_anterior_id = pago.comprobante_id
+    
+    try:
+        with transaction.atomic():
+            documento = Documento.objects.create(
+                nombre_archivo=archivo.name,
+                tipo=detectar_tipo_documento(archivo),
+                file=archivo,
+                tamano=archivo.size,
+                subido_por=request.user,
+            )
 
-    with transaction.atomic():
-        doc = Documento.objects.create(
-            nombre_archivo=(request.POST.get("nombre_archivo") or archivo.name).strip() or archivo.name,
-            tipo=tipo,
-            file=archivo,
-            tamano=getattr(archivo, "size", 0) or 0,
-            subido_por=request.user,
-        )
+            pago.comprobante = documento
+            pago.save(update_fields=["comprobante", "updated_at"])
 
-        anterior_id = pago.comprobante_id
-        pago.comprobante = doc
-        pago.save(update_fields=["comprobante", "updated_at"])
+            # Hay comprobante anterior
+            if comprobante_anterior_id:
+                log_poliza_event(
+                    poliza=pago.poliza,
+                    tipo=PolizaEvento.Tipo.PAGO_COMPROBANTE_REEMPLAZADO,
+                    actor=request.user,
+                    titulo="Comprobante reemplazado",
+                    detalle=f"Se reemplazó el comprobante del pago #{pago.id}.",
+                    data={
+                        "pago_id": pago.id,
+                        "documento_id_anterior": comprobante_anterior_id,
+                        "documento_id_nuevo": pago.comprobante_id,
+                        "nombre_archivo": documento.nombre_archivo,
+                        "tipo_documento": documento.tipo,
+                        "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
+                        "fecha_pago": str(pago.fecha_pago) if pago.fecha_pago else "",
+                        "monto": str(pago.monto),
+                        "moneda": pago.moneda,
+                        "metodo": pago.metodo,
+                        "referencia": pago.referencia,
+                    },
+                    dedupe_key=f"PAGO_COMPROBANTE_REEMPLAZADO:{pago.id}:{pago.comprobante_id}",
+                )
+                messages.success(request, "Comprobante reemplazado correctamente.")
+            else:
+                log_poliza_event(
+                    poliza=pago.poliza,
+                    tipo=PolizaEvento.Tipo.PAGO_COMPROBANTE_ADJUNTADO,
+                    actor=request.user,
+                    titulo="Comprobante adjuntado al pago",
+                    detalle=f"Se adjuntó comprobante al pago #{pago.id}.",
+                    data={
+                        "pago_id": pago.id,
+                        "documento_id": pago.comprobante_id,
+                        "nombre_archivo": documento.nombre_archivo,
+                        "tipo_documento": documento.tipo,
+                        "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
+                        "fecha_pago": str(pago.fecha_pago) if pago.fecha_pago else "",
+                        "monto": str(pago.monto),
+                        "moneda": pago.moneda,
+                        "metodo": pago.metodo,
+                        "referencia": pago.referencia,
+                    },
+                    dedupe_key=f"PAGO_COMPROBANTE_ADJUNTADO:{pago.id}:{pago.comprobante_id}",
+                )
+                messages.success(request, "Comprobante adjuntado correctamente.")
+                
+    except Exception as exc:
+        messages.error(request, f"No fue posible adjuntar el comprobante: {exc}")
+        return redirect(request.META.get("HTTP_REFERER") or "ui:pago_list")
 
-        # Bitácora en póliza (recomendado)
-        log_poliza_event(
-            poliza=pago.poliza,
-            tipo=getattr(PolizaEvento.Tipo, "PAGO_COMPROBANTE_ADJUNTADO", PolizaEvento.Tipo.CREADA),
-            actor=request.user,
-            titulo="Comprobante de pago adjuntado",
-            data={
-                "pago_id": pago.id,
-                "documento_id": doc.id,
-                "nombre_archivo": doc.nombre_archivo,
-                "reemplazo_de": anterior_id,
-                "fecha_programada": str(pago.fecha_programada),
-                "monto": str(pago.monto),
-            },
-        )
-
-==
-nuevo
-        log_poliza_event(
-            poliza=pago.poliza,
-            tipo=PolizaEvento.Tipo.PAGO_COMPROBANTE_ADJUNTADO,
-            actor=request.user,
-            titulo="Comprobante de pago adjuntado",
-            detalle=f"Se adjuntó comprobante al pago #{pago.id}.",
-            data={
-                "pago_id": pago.id,
-                "documento_id": pago.comprobante_id,
-                "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
-                "fecha_pago": str(pago.fecha_pago) if pago.fecha_pago else "",
-                "monto": str(pago.monto),
-                "moneda": pago.moneda,
-                "metodo": pago.metodo,
-                "referencia": pago.referencia,
-            },
-            dedupe_key=f"PAGO_COMPROBANTE_ADJUNTADO:{pago.id}:{pago.comprobante_id}",
-        )
-==
-    messages.success(request, "Comprobante adjuntado correctamente.")
-    return redirect("ui:pago_list")
+    return redirect(request.META.get("HTTP_REFERER") or "ui:pago_list")

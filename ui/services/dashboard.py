@@ -118,3 +118,70 @@ def agente_kpis(user):
         },
         "breakdown": breakdown_map,
     }
+
+from datetime import timedelta
+from decimal import Decimal
+
+from django.db.models import Sum, Value, DecimalField, Q
+from django.db.models.functions import Coalesce
+from django.utils.timezone import localdate
+
+from finanzas.models import Pago
+from ui.services.perms import can_see_pagos
+
+
+def queryset_pagos_dashboard(user):
+    qs = Pago.objects.select_related("poliza", "poliza__agente")
+
+    if can_see_pagos(user):
+        return qs
+
+    return qs.filter(poliza__agente=user)
+
+
+def obtener_kpis_cobranza(user):
+    hoy = localdate()
+    inicio_mes = hoy.replace(day=1)
+    limite_7 = hoy + timedelta(days=7)
+
+    qs = queryset_pagos_dashboard(user)
+
+    vencidos = qs.filter(estatus=Pago.Estatus.VENCIDO)
+    por_vencer = qs.filter(
+        estatus__in=[Pago.Estatus.PENDIENTE, Pago.Estatus.PARCIAL],
+        fecha_vencimiento__isnull=False,
+        fecha_vencimiento__gte=hoy,
+        fecha_vencimiento__lte=limite_7,
+    )
+    cobrados_mes = qs.filter(
+        estatus=Pago.Estatus.PAGADO,
+        fecha_pago__isnull=False,
+        fecha_pago__gte=inicio_mes,
+        fecha_pago__lte=hoy,
+    )
+
+    kpi = {
+        "cantidad_vencidos": vencidos.count(),
+        "monto_vencido": vencidos.aggregate(
+            total=Coalesce(
+                Sum("monto"),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+            )
+        )["total"],
+        "cantidad_por_vencer": por_vencer.count(),
+        "monto_por_vencer": por_vencer.aggregate(
+            total=Coalesce(
+                Sum("monto"),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+            )
+        )["total"],
+        "cantidad_cobrados_mes": cobrados_mes.count(),
+        "monto_cobrado_mes": cobrados_mes.aggregate(
+            total=Coalesce(
+                Sum("monto_pagado"),
+                Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+            )
+        )["total"],
+    }
+
+    return kpi

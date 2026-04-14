@@ -120,6 +120,62 @@
 
 </div>
 
+<!-- COBRANZA CARTERA VENCIDA, PAGOS POR VENCER -->
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Cartera vencida</div>
+        <div class="fs-4 fw-bold text-danger">
+          $ {{ kpis_cobranza.monto_vencido }}
+        </div>
+        <div class="small text-muted">
+          {{ kpis_cobranza.cantidad_vencidos }} pago{{ kpis_cobranza.cantidad_vencidos|pluralize }}
+        </div>
+        <div class="mt-2">
+          <a href="{% url 'ui:cartera_vencida' %}" class="btn btn-sm btn-outline-danger">
+            Ver cartera vencida
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="text-muted small">Pagos por vencer (7 días)</div>
+        <div class="fs-4 fw-bold text-warning">
+          $ {{ kpis_cobranza.monto_por_vencer }}
+        </div>
+        <div class="small text-muted">
+          {{ kpis_cobranza.cantidad_por_vencer }} pago{{ kpis_cobranza.cantidad_por_vencer|pluralize }}
+        </div>
+        <div class="mt-2">
+          <a href="{% url 'ui:pagos_por_vencer' %}" class="btn btn-sm btn-outline-warning">
+            Ver pagos por vencer
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="text-muted small">Cobrado este mes</div>
+        <div class="fs-4 fw-bold text-success">
+          $ {{ kpis_cobranza.monto_cobrado_mes }}
+        </div>
+        <div class="small text-muted">
+          {{ kpis_cobranza.cantidad_cobrados_mes }} pago{{ kpis_cobranza.cantidad_cobrados_mes|pluralize }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Polizas por Vencer -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">

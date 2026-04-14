@@ -53,11 +53,15 @@ class Command(BaseCommand):
             Pago.objects
             .select_related("poliza")
             .filter(
-                estatus=Pago.Estatus.PENDIENTE,
-                fecha_programada__lt=today,
+                estatus__in=[
+                    Pago.Estatus.PENDIENTE,
+                    Pago.Estatus.PARCIAL,  # queda fuera Pago.Estatus.EN_PROCESO,
+                ],                
+                fecha_vencimiento__isnull=False,
+                fecha_vencimiento__lt=today,
             )
             .exclude(poliza__estatus=Poliza.Estatus.CANCELADA)
-            .order_by("fecha_programada", "id")
+            .order_by("fecha_vencimiento", "id")
         )
 
         if limit:
@@ -94,6 +98,7 @@ class Command(BaseCommand):
             for pago in qs_cancelar.iterator(chunk_size=500):
                 pago.estatus = Pago.Estatus.CANCELADO
                 pago.save(update_fields=["estatus", "updated_at"])
+                updated_cancelar += 1
 
                 log_poliza_event(
                     poliza=pago.poliza,
@@ -102,8 +107,12 @@ class Command(BaseCommand):
                     titulo="Pago cancelado automáticamente",
                     data={
                         "pago_id": pago.id,
-                        "fecha_programada": str(pago.fecha_programada),
+                        "poliza_id": pago.poliza_id,
+                        "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
+                        "fecha_vencimiento": str(pago.fecha_vencimiento) if pago.fecha_vencimiento else "",
                         "monto": str(pago.monto),
+                        "moneda": pago.moneda,
+                        "referencia": pago.referencia,
                         "razon": "POLIZA_CANCELADA",
                     },
                     dedupe_key=f"PAGO_CANCELADO:{pago.id}",
@@ -112,16 +121,22 @@ class Command(BaseCommand):
             for pago in qs_vencer.iterator(chunk_size=500):
                 pago.estatus = Pago.Estatus.VENCIDO
                 pago.save(update_fields=["estatus", "updated_at"])
+                updated_vencer += 1
 
                 log_poliza_event(
                     poliza=pago.poliza,
                     tipo=PolizaEvento.Tipo.PAGO_VENCIDO,
                     actor=None,
                     titulo="Pago vencido automáticamente",
+                    detalle=f"El pago #{pago.id} venció el {pago.fecha_vencimiento}.",
                     data={
                         "pago_id": pago.id,
-                        "fecha_programada": str(pago.fecha_programada),
+                        "poliza_id": pago.poliza_id,
+                        "fecha_programada": str(pago.fecha_programada) if pago.fecha_programada else "",
+                        "fecha_vencimiento": str(pago.fecha_vencimiento) if pago.fecha_vencimiento else "",
                         "monto": str(pago.monto),
+                        "moneda": pago.moneda,
+                        "referencia": pago.referencia,
                     },
                     dedupe_key=f"PAGO_VENCIDO:{pago.id}",
                 )
@@ -129,4 +144,5 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f"Actualizados (con bitácora): CANCELADO={updated_cancelar}, VENCIDO={updated_vencer}. (hoy={today})"
         ))
+
 

@@ -204,13 +204,14 @@ class BasicDashboardView(LoginRequiredMixin, InternalRequiredMixin, TemplateView
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["role_label"] = "Lectura"
         return ctx
 
 
 # ---------------------------------------------------------------------
 # 3) Dashboard Agente
 # ---------------------------------------------------------------------
+
+from ui.services.dashboard import obtener_kpis_cobranza
 
 class AgenteDashboardView(LoginRequiredMixin, InternalRequiredMixin, TemplateView):
     template_name = "ui/dashboard/agente.html"
@@ -225,9 +226,8 @@ class AgenteDashboardView(LoginRequiredMixin, InternalRequiredMixin, TemplateVie
         user = self.request.user
         today = timezone.localdate()
 
-        ctx["role_label"] = "Agente"
         ctx["kpi"] = agente_kpis(user)
-
+        ctx["kpis_cobranza"] = obtener_kpis_cobranza(user)
         ctx["ultimas_polizas"] = (
             Poliza.objects
             .filter(agente=user)
@@ -278,7 +278,6 @@ class SupervisorDashboardView(LoginRequiredMixin, SupervisorRequiredMixin, Templ
         pagos = Pago.objects.all()
         comisiones = Comision.objects.all()
 
-        ctx["role_label"] = "Supervisor"
         ctx["today"] = today
 
         # KPIs pólizas
@@ -412,7 +411,6 @@ class AdminDashboardView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
         pagos = Pago.objects.all()
         comisiones = Comision.objects.all()
 
-        ctx["role_label"] = "Admin"
         ctx["today"] = today
 
         # KPIs globales
@@ -490,4 +488,3 @@ class AdminDashboardView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
         )
 
         return ctx
-    

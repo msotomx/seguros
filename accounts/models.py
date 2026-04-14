@@ -12,6 +12,7 @@ from core.models import TimeStampedModel
 class UserProfile(TimeStampedModel):
     class Rol(models.TextChoices):
         ADMIN = "ADMIN", "Admin"
+        SUPERVISOR = "SUPERVISOR", "Supervisor"
         AGENTE = "AGENTE", "Agente"
         OPERADOR = "OPERADOR", "Operador"
         LECTURA = "LECTURA", "Solo lectura"

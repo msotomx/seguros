@@ -641,6 +641,18 @@
                             Pago marcado como pagado
                             </span>
 
+                        {% elif e.tipo == "PAGO_COMPROBANTE_ADJUNTADO" %}
+                            <span class="text-primary">
+                              <i class="bi bi-paperclip me-1"></i>
+                              Comprobante adjuntado
+                            </span>
+
+                        {% elif e.tipo == "PAGO_COMPROBANTE_REEMPLAZADO" %}
+                            <span class="text-warning">
+                              <i class="bi bi-arrow-repeat me-1"></i>
+                              Comprobante reemplazado
+                            </span>
+
                         {% else %}
                             {{ e.titulo|default:e.get_tipo_display }}
                         {% endif %}
@@ -663,19 +675,26 @@
                     {# Detalles específicos para eventos de pagos #}
                     {% if e.tipo == "PAGO_VENCIDO" or e.tipo == "PAGO_CANCELADO" or e.tipo == "PAGO_PAGADO" %}
                         <div class="mt-1 text-muted" style="font-size:0.85rem;">
-                        {% if e.data.fecha_programada %}
-                            📅 {{ e.data.fecha_programada }}
-                        {% endif %}
-                        {% if e.data.monto %}
-                            · $ {{ e.data.monto }}
-                        {% endif %}
-                        {% if e.data.metodo %}
-                            · {{ e.data.metodo }}
-                        {% endif %}
-                        {% if e.data.referencia %}
-                            · Ref: {{ e.data.referencia }}
-                        {% endif %}
+                          {% if e.data.fecha_programada %}
+                              📅 {{ e.data.fecha_programada }}
+                          {% endif %}
+                          {% if e.data.monto %}
+                              · $ {{ e.data.monto }}
+                          {% endif %}
+                          {% if e.data.metodo %}
+                              · {{ e.data.metodo }}
+                          {% endif %}
+                          {% if e.data.referencia %}
+                              · Ref: {{ e.data.referencia }}
+                          {% endif %}
                         </div>
+                    {% elif e.tipo == "PAGO_COMPROBANTE_ADJUNTADO" or e.tipo == "PAGO_COMPROBANTE_REEMPLAZADO" %}
+                      <div class="mt-1 text-muted" style="font-size:0.85rem;">
+                        {% if e.data.fecha_pago %}📅 {{ e.data.fecha_pago }}{% endif %}
+                        {% if e.data.monto %} · $ {{ e.data.monto }}{% endif %}
+                        {% if e.data.referencia %} · Ref: {{ e.data.referencia }}{% endif %}
+                      </div>
+
                     {% else %}
                         {% if e.detalle %}
                         <div class="mt-1">{{ e.detalle }}</div>

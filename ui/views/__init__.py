@@ -27,10 +27,14 @@ from ui.views.polizas import poliza_marcar_vigente, poliza_actualizar_numero, po
 from ui.views.polizas import poliza_renovar, poliza_actualizar_vigencia, poliza_documento_subir
 from ui.views.pagos import PagoListView, pago_marcar_pagado, pago_comprobante_subir
 from ui.views.comisiones import ComisionListView, comision_marcar_pagada
+from ui.views.cobranza import CarteraVencidaListView, PagosPorVencerListView
 
 __all__ = [
     "DashboardView",
     "BasicDashboardView",
+    "AgenteDashboardView",
+    "SupervisorDashboardView", 
+    "AdminDashboardView",
     "CotizacionListView",
     "CotizacionDetailView",
     "cotizacion_select_item",
@@ -60,4 +64,6 @@ __all__ = [
     "pago_comprobante_subir",
     "ComisionListView",
     "comision_marcar_pagada",
+    "CarteraVencidaListView",
+    "PagosPorVencerListView",
 ]

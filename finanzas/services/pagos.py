@@ -73,7 +73,9 @@ def crear_plan_pagos(poliza: Poliza, *, overwrite=False):
                 poliza=poliza,
                 cliente=poliza.cliente,
                 fecha_programada=fecha,
+                fecha_vencimiento=fecha,  # + timedelta(days=5)
                 monto=monto,
+                moneda="MXN",
                 estatus=Pago.Estatus.PENDIENTE,
                 metodo="",
                 referencia="",
