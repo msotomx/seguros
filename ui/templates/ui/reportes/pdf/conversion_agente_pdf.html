@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9px; }
+  h2 { text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 4px; }
+  th { background-color: #eee; }
+  .right { text-align: right; }
+  .summary td { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h2>Reporte de Conversión por Agente</h2>
+<table class="filters">
+  <tr>
+    <td>
+      {% if q %}Buscar: {{ q }} | {% endif %}
+      {% if agente_id %}Agente ID: {{ agente_id }} | {% endif %}
+      {% if aseguradora_id %}Aseguradora ID: {{ aseguradora_id }} | {% endif %}
+      {% if estatus %}Estatus: {{ estatus }} | {% endif %}
+      {% if desde %}Desde: {{ desde }} | {% endif %}
+      {% if hasta %}Hasta: {{ hasta }}{% endif %}
+      {% if not q and not agente_id and not aseguradora_id and not estatus and not desde and not hasta %}
+        Sin filtros
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr class="summary">
+    <td>Cotizaciones</td>
+    <td>{{ total_cot }}</td>
+    <td>Pólizas</td>
+    <td>{{ total_pol }}</td>
+    <td>Conversión global</td>
+    <td>{{ conversion_global }}%</td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>Agente</th>
+      <th>Cotizaciones</th>
+      <th>Pólizas</th>
+      <th>Conversión</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in filas %}
+    <tr>
+      <td>{{ r.agente_nombre }}</td>
+      <td class="right">{{ r.cotizaciones }}</td>
+      <td class="right">{{ r.polizas }}</td>
+      <td class="right">{{ r.conversion }}%</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

@@ -1,0 +1,153 @@
+{% extends "ui/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h4 class="mb-0">Reporte de cobranza por agente</h4>
+      <div class="text-muted small">
+        Corte al {{ hoy|date:"d/m/Y" }}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="?{{ request.GET.urlencode }}&export=pdf" class="btn btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Filtros -->  
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2">
+        <div class="col-md-3">
+            <label class="form-label">Fecha desde</label>
+            <input type="date" name="fecha_desde" value="{{ fecha_desde|date:'Y-m-d' }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Fecha hasta</label>
+            <input type="date" name="fecha_hasta" value="{{ fecha_hasta|date:'Y-m-d' }}" class="form-control">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <a href="{% url 'ui:reporte_cobranza_agente' %}" class="btn btn-outline-secondary w-100">Limpiar</a>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <a href="{% url 'ui:reporte_cobranza_agente_excel' %}?fecha_desde={{ fecha_desde|date:'Y-m-d' }}&fecha_hasta={{ fecha_hasta|date:'Y-m-d' }}"
+            class="btn btn-outline-success w-100">
+            Exportar Excel
+            </a>
+        </div>
+        </form>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="text-muted small">Monto vencido</div>
+          <div class="fs-4 fw-bold text-danger">$ {{ totales.monto_vencido|floatformat:2|intcomma }}</div>
+          <div class="small text-muted">{{ totales.cantidad_vencidos }} pago{{ totales.cantidad_vencidos|pluralize }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="text-muted small">Monto por vencer (7 días)</div>
+          <div class="fs-4 fw-bold text-warning">$ {{ totales.monto_por_vencer|floatformat:2|intcomma }}</div>
+          <div class="small text-muted">{{ totales.cantidad_por_vencer }} pago{{ totales.cantidad_por_vencer|pluralize }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <div class="text-muted small">Cobrado este mes</div>
+          <div class="fs-4 fw-bold text-success">$ {{ totales.monto_cobrado|floatformat:2|intcomma }}</div>
+          <div class="small text-muted">{{ totales.cantidad_cobrados }} pagos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      {% if reporte %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle table-erp">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Agente</th>
+                <th class="text-end">Pagos vencidos</th>
+                <th class="text-end">Monto vencido</th>
+                <th class="text-end">Por vencer</th>
+                <th class="text-end">Monto por vencer</th>
+                <th class="text-end">Cobrados mes</th>
+                <th class="text-end">Monto cobrado mes</th>
+                <th class="text-end">Índice morosidad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in reporte %}
+                <tr>
+                  <td class="fw-semibold">{{ forloop.counter }}</td>  
+                  <td>
+                    <a href="{% url 'ui:reporte_cobranza_agente_detalle' r.agente_id %}?fecha_desde={{ fecha_desde|date:'Y-m-d' }}&fecha_hasta={{ fecha_hasta|date:'Y-m-d' }}">
+                        {{ r.agente_nombre }}
+                    </a>
+                  </td>                    
+                  <td class="text-end">{{ r.cantidad_vencidos }}</td>
+                  <td class="text-end text-danger">$ {{ r.monto_vencido|floatformat:2|intcomma }}</td>
+                  <td class="text-end">{{ r.cantidad_por_vencer }}</td>
+                  <td class="text-end text-warning">$ {{ r.monto_por_vencer|floatformat:2|intcomma }}</td>
+                  <td class="text-end">{{ r.cantidad_cobrados }}</td>
+                  <td class="text-end text-success">$ {{ r.monto_cobrado|floatformat:2|intcomma }}</td>
+                  <td class="text-end">
+                    <span class="
+                        {% if r.indice_morosidad > 20 %}
+                        text-danger fw-bold
+                        {% elif r.indice_morosidad > 10 %}
+                        text-warning fw-bold
+                        {% else %}
+                        text-success fw-bold
+                        {% endif %}
+                    ">
+                        {{ r.indice_morosidad|floatformat:2 }} %
+                    </span>
+                  </td>                  
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="fw-bold">
+                <td> </td>
+                <td>Totales</td>
+                <td class="text-end">{{ totales.cantidad_vencidos }}</td>
+                <td class="text-end text-danger">$ {{ totales.monto_vencido|floatformat:2|intcomma }}</td>
+                <td class="text-end">{{ totales.cantidad_por_vencer }}</td>
+                <td class="text-end text-warning">$ {{ totales.monto_por_vencer|floatformat:2|intcomma }}</td>
+                <td class="text-end">{{ totales.cantidad_cobrados }}</td>
+                <td class="text-end text-success">$ {{ totales.monto_cobrado|floatformat:2|intcomma }}</td>
+                <td class="text-end">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-muted">No hay información de cobranza para mostrar.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

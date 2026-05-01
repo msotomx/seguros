@@ -109,6 +109,9 @@ class ClienteUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
         messages.success(self.request, "Cliente actualizado correctamente.")
         return reverse_lazy("ui:cliente_detail", kwargs={"pk": self.object.pk})
 
+
+from finanzas.services.selectors import estado_cuenta_por_cliente
+
 class ClienteDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
     model = Cliente
     template_name = "ui/clientes/cliente_detail.html"
@@ -132,8 +135,13 @@ class ClienteDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView)
             "polizas": cliente.polizas.count(),
             "incidentes": cliente.incidentes.count(),
         }
-        return ctx
 
+        estado = estado_cuenta_por_cliente(cliente)
+        ctx["estado_cuenta_cliente"] = estado["resumen"]
+        ctx["pagos_estado_cuenta_cliente"] = estado["pagos"]
+
+        return ctx
+    
 
 @login_required
 @permission_required("crm.manage_portal_activo", raise_exception=True)
@@ -154,3 +162,51 @@ def cliente_portal_toggle(request, pk: int):
 
     # Regresa a la página previa si existe; si no, al dashboard UI
     return redirect(request.META.get("HTTP_REFERER", "ui:dashboard"))
+
+
+from django.contrib.auth.decorators import login_required, permission_required
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, render
+from django.template.loader import render_to_string
+
+from crm.models import Cliente
+from finanzas.services.selectors import estado_cuenta_por_cliente
+
+from io import BytesIO
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+
+def render_to_pdf(template_src, context_dict):
+    template = get_template(template_src)
+    html = template.render(context_dict)
+    result = BytesIO()
+    pdf = pisa.CreatePDF(html, dest=result)
+    if pdf.err:
+        return None
+    return result.getvalue()
+
+
+@login_required
+@permission_required("crm.view_cliente", raise_exception=True)
+def cliente_estado_cuenta_pdf(request, pk):
+    cliente = get_object_or_404(
+        Cliente.objects.select_related("owner", "direccion_fiscal", "direccion_contacto", "user_portal"),
+        pk=pk,
+    )
+
+    estado = estado_cuenta_por_cliente(cliente)
+
+    context = {
+        "cliente": cliente,
+        "estado_cuenta_cliente": estado["resumen"],
+        "pagos_estado_cuenta_cliente": estado["pagos"],
+    }
+
+    pdf = render_to_pdf("ui/clientes/cliente_estado_cuenta_pdf.html", context)
+    if not pdf:
+        return HttpResponse("Error al generar PDF", status=500)
+
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="estado_cuenta_cliente_{cliente.pk}.pdf"'
+    return response

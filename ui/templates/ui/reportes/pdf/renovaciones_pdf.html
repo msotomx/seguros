@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+{% load humanize %}
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9px; }
+  h2 { text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 4px; }
+  th { background-color: #eee; }
+  .right { text-align: right; }
+  .summary td { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h2>Reporte de Renovaciones Próximas</h2>
+<table class="filters">
+  <tr>
+    <td>
+      {% if q %}Buscar: {{ q }} | {% endif %}
+      {% if agente_id %}Agente ID: {{ agente_id }} | {% endif %}
+      {% if aseguradora_id %}Aseguradora ID: {{ aseguradora_id }} | {% endif %}
+      {% if estatus %}Estatus: {{ estatus }} | {% endif %}
+      {% if desde %}Desde: {{ desde }} | {% endif %}
+      {% if hasta %}Hasta: {{ hasta }}{% endif %}
+      {% if not q and not agente_id and not aseguradora_id and not estatus and not desde and not hasta %}
+        Sin filtros
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr class="summary">
+    <td>Pólizas por renovar</td>
+    <td>{{ total_registros }}</td>
+    <td>Prima total a renovar</td>
+    <td>{{ prima_total_renovar|intcomma:2 }}</td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>Vence</th>
+      <th>Póliza</th>
+      <th>Cliente</th>
+      <th>Aseguradora</th>
+      <th>Agente</th>
+      <th>Prima total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in polizas %}
+    <tr>
+      <td>{{ p.vigencia_hasta|date:"d/m/Y" }}</td>
+      <td>{{ p.numero_poliza|default:p.id }}</td>
+      <td>{{ p.cliente|default:"" }}</td>
+      <td>{{ p.aseguradora|default:"" }}</td>
+      <td>{{ p.agente|default:"" }}</td>
+      <td class="right">{{ p.prima_total }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

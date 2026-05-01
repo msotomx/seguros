@@ -1,23 +1,17 @@
 from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel, MoneyMixin
+from decimal import Decimal
+from django.core.validators import MinValueValidator
+from django.utils import timezone
+
 from documentos.models import Documento
 from polizas.models import Poliza
+from catalogos.models import Aseguradora, ProductoSeguro
 
 # ---------------------------------------------------------------------
 # Finanzas: Pagos / Comisiones (cuentas simples)
 # ---------------------------------------------------------------------
-
-from decimal import Decimal
-
-from django.conf import settings
-from django.core.validators import MinValueValidator
-from django.db import models
-from django.utils import timezone
-
-from core.models import TimeStampedModel
-from documentos.models import Documento
-
 
 class Pago(TimeStampedModel):
     class Estatus(models.TextChoices):
@@ -329,23 +323,84 @@ class PagoTransaccion(TimeStampedModel):
         return f"Tx #{self.pk} | Pago #{self.pago_id} | {self.tipo}"
 
 
-class Comision(TimeStampedModel, MoneyMixin):
+class Comision(models.Model):
+
     class Estatus(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
         PAGADA = "PAGADA", "Pagada"
+        CANCELADA = "CANCELADA", "Cancelada"
 
     poliza = models.ForeignKey(Poliza, on_delete=models.CASCADE, related_name="comisiones")
     agente = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="comisiones")
-    porcentaje = models.DecimalField(max_digits=6, decimal_places=3, default=0)  # 0-100
-    monto = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    estatus = models.CharField(max_length=10, choices=Estatus.choices, default=Estatus.PENDIENTE, db_index=True)
-    fecha_pago = models.DateField(null=True, blank=True, db_index=True)
+    porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    base_calculo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    monto_comision = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    estatus = models.CharField(max_length=20, choices=Estatus.choices, default=Estatus.PENDIENTE, db_index=True)
+    fecha_generacion = models.DateField(default=timezone.localdate, db_index=True)
+    fecha_pago = models.DateField(null=True, blank=True)
+    notas = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering = ["-fecha_generacion", "-id"]
+        verbose_name = "Comisión"
+        verbose_name_plural = "Comisiones"
+
         indexes = [
             models.Index(fields=["agente", "estatus"]),
             models.Index(fields=["poliza", "estatus"]),
         ]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["poliza", "agente"],
+                name="uq_comision_poliza_agente"
+            )
+        ]
+
         permissions = [
             ("manage_comisiones", "Puede administrar comisiones"),
         ]
+
+    def __str__(self):
+        return f"Comisión {self.poliza_id} - {self.agente} - {self.monto_comision}"
+
+class ConfiguracionComision(models.Model):
+    aseguradora = models.ForeignKey(Aseguradora, on_delete=models.CASCADE)
+    producto = models.ForeignKey(ProductoSeguro, on_delete=models.CASCADE, null=True, blank=True)
+    ramo = models.CharField(max_length=50, blank=True)
+
+    porcentaje = models.DecimalField(max_digits=5, decimal_places=2)
+
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("aseguradora", "producto", "ramo")
+
+class SeguimientoCobranza(models.Model):
+
+    class Tipo(models.TextChoices):
+        LLAMADA = "LLAMADA", "Llamada"
+        WHATSAPP = "WHATSAPP", "WhatsApp"
+        EMAIL = "EMAIL", "Email"
+        PROMESA_PAGO = "PROMESA_PAGO", "Promesa de pago"
+        NOTA = "NOTA", "Nota"
+        OTRO = "OTRO", "Otro"
+
+    pago = models.ForeignKey(Pago, on_delete=models.CASCADE, related_name="seguimientos")
+    tipo = models.CharField(max_length=30, choices=Tipo.choices,
+                            default=Tipo.NOTA, db_index=True)
+    comentario = models.TextField()
+    proxima_accion = models.DateField(null=True, blank=True)
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+                                    null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "Seguimiento de cobranza"
+        verbose_name_plural = "Seguimientos de cobranza"
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - Pago {self.pago_id}"

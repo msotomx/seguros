@@ -21,6 +21,16 @@ def month_range(today: date | None = None):
         end = start.replace(month=start.month + 1)
     return start, end
 
+def calcular_indice_morosidad(total_programado, total_vencido):
+    if not total_programado or total_programado == 0:
+        return Decimal("0.00")
+    return (total_vencido / total_programado) * 100
+
+
+from decimal import Decimal
+from django.db.models.functions import Coalesce
+from django.db.models import Value, DecimalField
+
 
 def agente_kpis(user):
     """
@@ -73,10 +83,45 @@ def agente_kpis(user):
         estatus=Pago.Estatus.VENCIDO,
     )
 
+    # Todos los pagos del agente
+    pagos_agente = Pago.objects.filter(poliza__agente=user)
+
+    total_programado = pagos_agente.aggregate(
+        total=Coalesce(
+            Sum("monto"),
+            Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+        )
+    )["total"]
+
+    total_vencido = pagos_agente.aggregate(
+        total=Coalesce(
+            Sum("monto", filter=Q(estatus=Pago.Estatus.VENCIDO)),
+            Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+        )
+    )["total"]
+
+    # KPI índice de morosidad
+    if total_programado > 0:
+        indice_morosidad = (total_vencido / total_programado) * 100
+    else:
+        indice_morosidad = Decimal("0.00")
+
     # Comisiones pendientes (monto)
-    com_pendientes = Comision.objects.filter(
+    comisiones_pendientes = Comision.objects.filter(
         agente=user,
         estatus=Comision.Estatus.PENDIENTE,
+    )
+    comisiones_pagadas_mes = Comision.objects.filter(
+        agente=user,
+        estatus=Comision.Estatus.PAGADA,
+        fecha_pago__gte=start_m,
+        fecha_pago__lt=end_m,
+    )
+    ultimas_comisiones = (
+        Comision.objects
+        .filter(agente=user)
+        .select_related("poliza", "poliza__cliente")
+        .order_by("-fecha_generacion", "-id")[:8]
     )
 
     # Top: últimas cotizaciones (para “trabajo del día”)
@@ -96,7 +141,7 @@ def agente_kpis(user):
         .order_by()
     )
     breakdown_map = {row["estatus"]: row["total"] for row in breakdown}
-
+    
     return {
         "period": {"start": start_m, "end": end_m},
         "counts": {
@@ -105,19 +150,41 @@ def agente_kpis(user):
             "pol_vigentes": pol_vigentes.count(),
             "pol_por_vencer": pol_por_vencer.count(),
             "pagos_vencidos": pagos_vencidos.count(),
+
+            # Comisiones
+            "comisiones_pendientes": comisiones_pendientes.count(),
+            "comisiones_pagadas_mes": comisiones_pagadas_mes.count(),
         },
         "money": {
-            "com_pendiente_total": com_pendientes.aggregate(s=Sum("monto"))["s"] or 0,
+            "comisiones_pendiente_total": comisiones_pendientes.aggregate(
+                total=Coalesce(
+                    Sum("monto_comision"),
+                    Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+                )
+            )["total"],
+
+            "comisiones_pagadas_mes_total": comisiones_pagadas_mes.aggregate(
+                total=Coalesce(
+                    Sum("monto_comision"),
+                    Value(Decimal("0.00"), output_field=DecimalField(max_digits=14, decimal_places=2)),
+                )
+            )["total"],
+
+            "total_programado": total_programado,
+            "monto_vencido": total_vencido,
         },
         "rates": {
             "conversion_pct": round(conversion_pct, 2),
+            "indice_morosidad": round(indice_morosidad, 2),
         },
         "lists": {
             "ult_cot": ult_cot,
             "pol_por_vencer": pol_por_vencer.select_related("cliente", "aseguradora")[:8],
+            "ultimas_comisiones": ultimas_comisiones,
         },
         "breakdown": breakdown_map,
     }
+
 
 from datetime import timedelta
 from decimal import Decimal

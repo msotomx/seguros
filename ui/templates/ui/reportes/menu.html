@@ -1,0 +1,151 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="mb-4">
+    <h3 class="mb-1">Reportes</h3>
+    <p class="text-muted mb-0">
+      Consulta reportes administrativos de producción, cartera, comisiones y renovaciones.
+    </p>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Producción por agente -->
+    <div class="col-md-6 col-xl-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center"
+                 style="width: 48px; height: 48px;">
+              <i class="bi bi-bar-chart-line fs-4"></i>
+            </div>
+            <div>
+              <h5 class="mb-0">Producción por agente</h5>
+              <small class="text-muted">Pólizas, prima y producción.</small>
+            </div>
+          </div>
+
+          <p class="text-muted small flex-grow-1">
+            Analiza la producción generada por cada agente en un periodo determinado.
+          </p>
+        
+          <a href="{% url 'ui:reporte_produccion_agente' %}" class="btn btn-primary mt-auto">
+            Abrir reporte
+          </a>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Conversión por agente -->
+    <div class="col-md-6 col-xl-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center"
+                 style="width: 48px; height: 48px;">
+              <i class="bi bi-graph-up-arrow fs-4"></i>
+            </div>
+            <div>
+              <h5 class="mb-0">Conversión por agente</h5>
+              <small class="text-muted">Cotizaciones vs pólizas.</small>
+            </div>
+          </div>
+
+          <p class="text-muted small flex-grow-1">
+            Mide el porcentaje de conversión de cotizaciones a pólizas emitidas.
+          </p>
+
+          <a href="{% url 'ui:reporte_conversion_agente' %}" class="btn btn-primary mt-auto">
+            Abrir reporte
+          </a>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Cartera vencida -->
+    <div class="col-md-6 col-xl-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
+                 style="width: 48px; height: 48px;">
+              <i class="bi bi-exclamation-triangle fs-4"></i>
+            </div>
+            <div>
+              <h5 class="mb-0">Cartera vencida</h5>
+              <small class="text-muted">Pagos vencidos y morosidad.</small>
+            </div>
+          </div>
+
+          <p class="text-muted small flex-grow-1">
+            Consulta pagos vencidos por cliente, póliza, agente y monto.
+          </p>
+
+          <a href="{% url 'ui:reporte_cartera_vencida' %}" class="btn btn-primary mt-auto">
+            Abrir reporte
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comisiones -->
+    <div class="col-md-6 col-xl-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
+                 style="width: 48px; height: 48px;">
+              <i class="bi bi-cash-coin fs-4"></i>
+            </div>
+            <div>
+              <h5 class="mb-0">Comisiones</h5>
+              <small class="text-muted">Pagadas y pendientes.</small>
+            </div>
+          </div>
+
+          <p class="text-muted small flex-grow-1">
+            Consulta comisiones por agente, póliza, estatus, fecha y monto.
+          </p>
+
+          <a href="{% url 'ui:reporte_comisiones' %}" class="btn btn-primary mt-auto">
+            Abrir reporte
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Renovaciones próximas -->
+    <div class="col-md-6 col-xl-4">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center"
+                 style="width: 48px; height: 48px;">
+              <i class="bi bi-arrow-repeat fs-4"></i>
+            </div>
+            <div>
+              <h5 class="mb-0">Renovaciones próximas</h5>
+              <small class="text-muted">Pólizas por vencer.</small>
+            </div>
+          </div>
+
+          <p class="text-muted small flex-grow-1">
+            Revisa pólizas próximas a vencer para seguimiento y renovación.
+          </p>
+
+          <a href="{% url 'ui:reporte_renovaciones' %}" class="btn btn-primary mt-auto">
+            Abrir reporte
+          </a>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

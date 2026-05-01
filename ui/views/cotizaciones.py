@@ -652,7 +652,12 @@ def cotizacion_emitir_poliza(request, pk: int):
     with transaction.atomic():
         # número de póliza: placeholder (hasta integrar emisión real con aseguradora)
         numero = f"TEMP-{selected_item.cotizacion.folio}"
-
+        prima_neta=selected_item.prima_total
+        financiamiento=Decimal(0.00)
+        gastos_expedicion=Decimal(0.00)
+        subtotal=prima_neta + financiamiento + gastos_expedicion
+        iva = subtotal * Decimal(0.16)
+        prima_total = subtotal + iva
         poliza = Poliza.objects.create(
             cliente=cot.cliente,
             vehiculo=cot.vehiculo,
@@ -665,7 +670,12 @@ def cotizacion_emitir_poliza(request, pk: int):
             vigencia_desde=cot.vigencia_desde,
             vigencia_hasta=cot.vigencia_hasta,
             estatus=Poliza.Estatus.EN_PROCESO,
-            prima_total=selected_item.prima_total,
+            prima_neta=prima_neta,
+            financiamiento=financiamiento,
+            gastos_expedicion=gastos_expedicion,
+            subtotal=subtotal,
+            iva=iva,
+            prima_total=prima_total,
             forma_pago=fp,
             agente=cot.owner,
         )

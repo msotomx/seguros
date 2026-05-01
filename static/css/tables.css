@@ -1,0 +1,19 @@
+.table-erp td,
+.table-erp th {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.table-erp thead th {
+  white-space: nowrap;
+}
+
+.table-erp .text-end {
+  white-space: nowrap;
+}
+/* para el ancho de las columnas al generar el archivo pdf */
+table {
+  width: 100%;
+  table-layout: fixed;
+}

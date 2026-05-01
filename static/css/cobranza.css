@@ -1,0 +1,17 @@
+.badge-vencido {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.badge-por-vencer {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.row-vencido {
+  background-color: rgba(220, 53, 69, 0.08);
+}
+
+.row-parcial {
+  background-color: rgba(255, 193, 7, 0.12);
+}

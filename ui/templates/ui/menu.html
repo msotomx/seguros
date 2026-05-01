@@ -51,44 +51,21 @@
         Pagos
       </a>
     </li>
-
-    <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="collapse" href="#menuCobranza" role="button" aria-expanded="false" aria-controls="menuCobranza">
-        Cobranza
+    <li>
+      <a class="nav-link" href="{% url 'ui:cobranza_menu' %}">
+        Reportes de Cobranza
       </a>
-
-      <div class="collapse" id="menuCobranza">
-        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
-          <li>
-            <a href="{% url 'ui:cartera_vencida' %}" class="nav-link">
-              Cartera vencida
-            </a>
-          </li>
-          <li>
-            <a href="{% url 'ui:pagos_por_vencer' %}" class="nav-link"> # en los proximos 7 dias
-              Pagos por vencer
-            </a>
-          </li>
-          <li>
-            <a href="{% url 'ui:cartera_vencida' %}" class="nav-link">  <!-- pagos_por_vencer -->
-              Estado de Cuenta
-            </a>
-          </li>
-          <li>
-            <a href="{% url 'ui:cartera_vencida' %}" class="nav-link">  <!-- pagos_por_vencer -->
-              Seguimiento
-            </a>
-          </li>
-          <li>
-            <a href="{% url 'ui:cartera_vencida' %}" class="nav-link">  <!-- pagos_por_vencer -->
-              Reportes de Cobranza
-            </a>
-          </li>
-
-        </ul>
-      </div>
     </li>
-
+    <li>
+      <a class="nav-link" href="{% url 'ui:comision_list' %}">
+          Comisiones
+      </a>
+    </li>
+    <li>
+      <a class="nav-link" href="{% url 'ui:reporte_menu' %}">
+        Reportes
+      </a>
+    </li>  
   {% endif %}
 
   <!-- Supervisor -->

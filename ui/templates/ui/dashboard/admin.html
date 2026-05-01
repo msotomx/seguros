@@ -35,6 +35,9 @@
                 <div class="card-body">
                     <div class="text-muted small">Clientes Totales</div>
                     <div class="fs-3 fw-bold">{{ kpi_global.clientes_total|intcomma }}</div>
+                    <div class="small text-muted">
+                        Ultimos 30 días: {{ kpi_global.nuevos_clientes_30d|intcomma }}
+                    </div>                    
                 </div>
             </div>
         </a>
@@ -78,7 +81,10 @@
             </div>
         </a>
     </div>
+  </div>
 
+  <!-- Pagos y Cobranza -->
+  <div class="row g-3 mb-4">
     <div class="col-md-3">
         <a href="{% url 'ui:pago_list' %}?estatus=PENDIENTE" class="dashboard-card-link">
             <div class="card shadow-sm border-0 h-100">
@@ -120,21 +126,40 @@
         </div>
         </a>
     </div>
+  </div>
 
+  <!-- Comisiones -->
+  <div class="row g-3 mb-4">
     <div class="col-md-3">
-        <a href="{% url 'ui:pago_list' %}?estatus=PENDIENTE" class="dashboard-card-link">  <!-- debe ser comision_list -->
+        <a href="{% url 'ui:comision_list' %}?estatus=PENDIENTE" class="dashboard-card-link">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <div class="text-muted small">Comisiones Pendientes</div>
-                    <div class="fs-3 fw-bold">{{ kpi_global.comisiones_pendientes|intcomma }}</div>
+                    <div class="text-muted small"><strong>Comisiones Pendientes</strong></div>
+                    <div class="fs-3 fw-bold text-success">
+                      ${{ comisiones_kpi.monto_pendiente|floatformat:2|intcomma }}
+                    </div>
                     <div class="small text-muted">
-                        ${{ kpi_global.monto_comisiones_pendientes|floatformat:2|intcomma }}
+                        Comisiones: {{ comisiones_kpi.pendientes }}
                     </div>
                 </div>
+
             </div>
         </a>
     </div>
 
+    <div class="col-md-3">
+      <a href="{% url 'ui:comision_list' %}?estatus=PAGADA&ultimos=30" class="dashboard-card-link">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <div class="text-muted small"><strong>Comisiones Pagadas (30 días)</strong></div>
+            <div class="fs-3 fw-bold">${{ comisiones_kpi.monto_pagado_30d|intcomma }}</div>
+            <div class="small text-muted">
+              Comisiones: {{ comisiones_kpi.pagadas_30d }} 
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
   </div>
 
   <!-- Tablas principales -->
@@ -145,7 +170,7 @@
         <div class="card-header bg-white fw-semibold">Pólizas próximas a vencer (30 días)</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>Vigencia hasta</th>
@@ -179,7 +204,7 @@
         <div class="card-header bg-white fw-semibold">Últimos pagos registrados</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>Póliza</th>
@@ -220,7 +245,7 @@
         <div class="card-header bg-white fw-semibold">Últimas pólizas</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>No. póliza</th>
@@ -251,6 +276,44 @@
       </div>
     </div>
 
+    <!-- Ultimas Comisiones -->
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Últimas Comisiones</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 table-erp">
+              <thead class="table-light">
+                <tr>
+                  <th>No. póliza</th>
+                  <th>Agente</th>
+                  <th>Comisión</th>
+                  <th>Estatus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in ultimas_comisiones %}
+                <tr>
+                  <td>{{ p.poliza }}</td>
+                  <td>{{ p.agente|default:"-" }}</td>
+                  <td>{{ p.monto_comision|intcomma:2 }}</td>
+                  <td>{{ p.estatus }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">Sin comisiones registradas.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div> <!-- Ultimas comisiones -->     
+  </div>
+
+  <!-- Eventos-->
+  <div class="row g-4 mt-1">
     <div class="col-lg-6">
       <div class="card shadow-sm border-0">
         <div class="card-header bg-white fw-semibold">Actividad reciente</div>

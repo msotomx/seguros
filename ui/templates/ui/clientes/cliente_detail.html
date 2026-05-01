@@ -1,4 +1,5 @@
 {% extends "ui/base.html" %}
+{% load humanize %}
 {% block title %}Cliente{% endblock %}
 
 {% block content %}
@@ -77,6 +78,16 @@
     </a>
   </div>
 </div>
+
+{% if estado_cuenta_cliente.total_vencido > 0 %}
+  <div class="alert alert-danger mt-3">
+    Este cliente tiene cartera vencida por <strong>$ {{ estado_cuenta_cliente.total_vencido|floatformat:2|intcomma }}</strong>.
+  </div>
+{% elif estado_cuenta_cliente.total_pendiente > 0 %}
+  <div class="alert alert-warning mt-3">
+    Este cliente tiene pagos pendientes por <strong>$ {{ estado_cuenta_cliente.total_pendiente|floatformat:2|intcomma }}</strong>.
+  </div>
+{% endif %}
 
 <div class="row g-3">
   <!-- Columna izquierda: Datos -->
@@ -252,4 +263,120 @@
 
   </div>
 </div>
+{% load humanize %}
+
+<!-- Estado de Cuenta del Cliente -->
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+      <h6 class="mb-0">Estado de cuenta del cliente</h6>
+      <a href="{% url 'ui:cliente_estado_cuenta_pdf' cliente.pk %}" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i> Generar PDF
+      </a>
+    </div>
+
+    <hr class="my-2">
+
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="small text-muted">Total programado</div>
+        <div class="fw-semibold">$ {{ estado_cuenta_cliente.total_programado|floatformat:2|intcomma }}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="small text-muted">Pagado</div>
+        <div class="fw-semibold text-success">$ {{ estado_cuenta_cliente.total_pagado|floatformat:2|intcomma }}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="small text-muted">Pendiente</div>
+        <div class="fw-semibold text-warning">$ {{ estado_cuenta_cliente.total_pendiente|floatformat:2|intcomma }}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="small text-muted">Vencido</div>
+        <div class="fw-semibold text-danger">$ {{ estado_cuenta_cliente.total_vencido|floatformat:2|intcomma }}</div>
+      </div>
+    </div>
+
+    <div class="mt-3">
+      <div class="small text-muted">Saldo total</div>
+      <div class="fs-5 fw-bold">$ {{ estado_cuenta_cliente.saldo|floatformat:2|intcomma }}</div>
+  
+    </div>
+  </div>
+</div>
+<!-- Detalle de Pagos del Cliente -->
+<div class="card shadow-sm mt-3">
+  <div class="card-body">
+    <h6 class="mb-0">Detalle de movimientos del cliente</h6>
+    <hr class="my-2">
+
+    {% if pagos_estado_cuenta_cliente %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle table-erp">
+          <thead>
+            <tr>
+              <th>Póliza</th>
+              <th>Aseguradora</th>
+              <th>Fecha programada</th>
+              <th>Vencimiento</th>
+              <th>Monto</th>
+              <th>Pagado</th>
+              <th>Estatus</th>
+              <th>Referencia</th>
+              <th>Comprobante</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in pagos_estado_cuenta_cliente %}
+              <tr class="{% if p.estatus == 'VENCIDO' %}table-danger{% elif p.estatus == 'PARCIAL' %}table-warning{% endif %}">
+                <td>
+                  {% if p.poliza %}
+                    <a href="{% url 'ui:poliza_detail' p.poliza.pk %}">
+                      {{ p.poliza.numero_poliza }}
+                    </a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>{{ p.poliza.aseguradora.nombre|default:"-" }}</td>
+                <td>{{ p.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+                <td>{{ p.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+                <td>{{ p.moneda }} {{ p.monto|floatformat:2|intcomma }}</td>
+                <td>
+                  {% if p.monto_pagado %}
+                    {{ p.moneda }} {{ p.monto_pagado|floatformat:2|intcomma }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>
+                  <span class="badge
+                    {% if p.estatus == 'PAGADO' %}bg-success
+                    {% elif p.estatus == 'VENCIDO' %}bg-danger
+                    {% elif p.estatus == 'PARCIAL' %}bg-warning text-dark
+                    {% elif p.estatus == 'EN_PROCESO' %}bg-info text-dark
+                    {% else %}bg-secondary{% endif %}">
+                    {{ p.get_estatus_display }}
+                  </span>
+                </td>
+                <td>{{ p.referencia|default:"-" }}</td>
+                <td>
+                  {% if p.comprobante %}
+                    <a href="{% url 'documentos:download' p.id %}" class="btn btn-sm btn-outline-secondary">
+                      Ver comprobante
+                    </a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted">Este cliente no tiene movimientos de cuenta.</div>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

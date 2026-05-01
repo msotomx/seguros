@@ -49,6 +49,7 @@
             <th class="text-end">Monto</th>
             <th>Estatus</th>
             <th class="text-end">Acción</th>
+            <th class="text-end">Fecha Pago</th>
           </tr>
         </thead>
         <tbody>
@@ -71,18 +72,19 @@
                   <span class="badge bg-success">Pagada</span>
                 {% endif %}
               </td>
+                <td class="text-end">
+                    <a href="{% url 'ui:poliza_detail' c.poliza.pk %}" class="btn btn-sm btn-outline-primary">
+                        Ver póliza
+                    </a>
+                </td>
+
                 <td class="text-end align-middle">
-                    {% if c.estatus == "PENDIENTE" %}
-                        <form method="post" action="{% url 'ui:comision_marcar_pagada' c.pk %}" class="d-inline">
-                        {% csrf_token %}
-                        <button class="btn btn-sm btn-outline-success" type="submit">
-                            <i class="bi bi-check2-circle me-1"></i> Marcar pagada
-                        </button>
-                        </form>
-                    {% else %}
+                    {% if c.estatus == "PAGADA" %}
                         <span class="badge bg-success-subtle text-success" style="font-size:0.7rem;">
                         Pagada {{ c.fecha_pago|date:"d/M/Y" }}
                         </span>
+                    {% else %}
+                        <span class="text-muted">—</span>
                     {% endif %}
                 </td>
 

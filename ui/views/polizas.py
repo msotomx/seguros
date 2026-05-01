@@ -11,13 +11,13 @@ from django.utils.timezone import localdate
 from django.views.decorators.http import require_POST
 from datetime import timedelta, datetime
 from django.utils import timezone
+from decimal import Decimal
 
 from polizas.services import log_poliza_event
 from ui.services.perms import can_manage_poliza
 from ui.services.perms import can_update_poliza_numero, can_admin_polizas
 
-from polizas.models import PolizaEvento
-from polizas.models import Poliza
+from polizas.models import Poliza, PolizaEvento
 from finanzas.models import Pago, Comision
 from documentos.models import Documento
 from documentos.views import documento_download
@@ -91,6 +91,8 @@ class PolizaListView(LoginRequiredMixin, ListView):
         ctx["estatus_choices"] = getattr(Poliza, "Estatus", None).choices if hasattr(Poliza, "Estatus") else []
         return ctx
 
+from finanzas.services.selectors import estado_cuenta_por_poliza
+
 class PolizaDetailView(LoginRequiredMixin, DetailView):
     model = Poliza
     template_name = "ui/polizas/poliza_detail.html"
@@ -112,9 +114,9 @@ class PolizaDetailView(LoginRequiredMixin, DetailView):
         poliza = ctx["poliza"]
         ctx["eventos"] = poliza.eventos.select_related("actor").all()[:50]
         ctx["ult_pagos"] = poliza.pagos.order_by("fecha_programada")[:6]
-        ctx["comision"] = poliza.comisiones.order_by("-created_at").first()
+        ctx["comision"] = poliza.comisiones.select_related("agente").order_by("-created_at").first()
         ctx["can_admin_polizas"] = can_admin_polizas(self.request.user)
-
+        
         # --- PAGOS ---
         pagos_qs = poliza.pagos.all().order_by("fecha_programada")
         pagos_sum = pagos_qs.aggregate(
@@ -136,9 +138,9 @@ class PolizaDetailView(LoginRequiredMixin, DetailView):
         # --- COMISIONES ---
         com_qs = poliza.comisiones.all().order_by("-created_at")
         com_sum = com_qs.aggregate(
-            total=Sum("monto"),
-            pagada=Sum("monto", filter=Q(estatus=Comision.Estatus.PAGADA)),
-            pendiente=Sum("monto", filter=Q(estatus=Comision.Estatus.PENDIENTE)),
+            total=Sum("monto_comision"),
+            pagada=Sum("monto_comision", filter=Q(estatus=Comision.Estatus.PAGADA)),
+            pendiente=Sum("monto_comision", filter=Q(estatus=Comision.Estatus.PENDIENTE)),
         )
         com_total = com_sum["total"] or 0
         com_pagada = com_sum["pagada"] or 0
@@ -162,11 +164,15 @@ class PolizaDetailView(LoginRequiredMixin, DetailView):
                 "ultima": ultima_comision,
             },
         }
+        estado = estado_cuenta_por_poliza(self.object)
+        ctx["estado_cuenta"] = estado["resumen"]
+        ctx["pagos_estado_cuenta"] = estado["pagos"]
+        ctx["hoy"] = timezone.localdate()
         return ctx
 
 
 from finanzas.services.pagos import crear_plan_pagos
-from finanzas.services.comisiones import crear_comision_poliza
+from finanzas.services.comisiones import generar_comision_poliza
 
 @login_required
 @require_POST
@@ -200,7 +206,13 @@ def poliza_marcar_vigente(request, pk):
         # crear pagos después
         n = crear_plan_pagos(poliza, overwrite=False)
         # genera comisiones de la poliza
-        crear_comision_poliza(poliza, overwrite=False)
+        # Si se va a generar la comision desde que se genera la poliza, quitar los siguientes comentarios 
+        # agente = poliza.agente
+        # generar_comision_poliza(
+        #    poliza=poliza,
+        #    agente=agente,
+        #    usuario=request.user,
+        # )
 
         # Actualizar Bitacora de Eventos
         log_poliza_event(
@@ -538,3 +550,90 @@ def poliza_documento_subir(request, pk):
 
     messages.success(request, "Documento adjuntado correctamente.")
     return redirect("ui:poliza_detail", pk=poliza.pk)
+
+from django.views import View
+from django.views.generic import CreateView, UpdateView
+
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.utils import timezone
+
+from polizas.models import Endoso, Poliza
+from polizas.services import crear_endoso
+from polizas.forms import EndosoForm
+from django.contrib import messages
+from polizas.services import crear_endoso, editar_endoso, eliminar_endoso
+
+# ================================================
+# ENDOSOS
+# ================================================
+class EndosoCreateView(CreateView):
+    model = Endoso
+    form_class = EndosoForm
+    template_name = "ui/polizas/endoso_form.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.poliza = get_object_or_404(Poliza, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial["fecha"] = timezone.localdate().strftime("%Y-%m-%d")
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["poliza"] = self.poliza
+        return context
+
+    def form_valid(self, form):
+        crear_endoso(
+            poliza=self.poliza,
+            tipo_endoso=form.cleaned_data["tipo_endoso"],
+            descripcion=form.cleaned_data.get("descripcion"),
+            prima_ajuste=form.cleaned_data.get("prima_ajuste"),
+            fecha=form.cleaned_data.get("fecha"),
+            documento=form.cleaned_data.get("documento"),
+            usuario=self.request.user,
+        )
+
+        return redirect(reverse("ui:poliza_detail", kwargs={"pk": self.poliza.pk}))
+
+
+class EndosoUpdateView(UpdateView):
+    model = Endoso
+    form_class = EndosoForm
+    template_name = "ui/polizas/endoso_form.html"
+    context_object_name = "endoso"
+
+    def get_queryset(self):
+        return Endoso.objects.select_related("poliza", "documento")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["poliza"] = self.object.poliza
+        context["modo"] = "editar"
+        context["titulo"] = "Editar endoso"
+        return context
+
+    def form_valid(self, form):
+        editar_endoso(
+            endoso=self.object,
+            tipo_endoso=form.cleaned_data["tipo_endoso"],
+            descripcion=form.cleaned_data.get("descripcion"),
+            prima_ajuste=form.cleaned_data.get("prima_ajuste"),
+            fecha=form.cleaned_data.get("fecha"),
+            documento=form.cleaned_data.get("documento"),
+            usuario=self.request.user,
+        )
+        messages.success(self.request, "El endoso se actualizó correctamente.")
+        return redirect("ui:poliza_detail", pk=self.object.poliza.pk)
+
+
+class EndosoDeleteView(View):
+    def post(self, request, pk):
+        endoso = get_object_or_404(Endoso.objects.select_related("poliza"), pk=pk)
+        poliza_id = endoso.poliza_id
+        eliminar_endoso(endoso=endoso, usuario=request.user)
+        messages.success(request, "El endoso se eliminó correctamente.")
+        return redirect("ui:poliza_detail", pk=poliza_id)

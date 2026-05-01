@@ -11,6 +11,7 @@ from catalogos.models import Aseguradora, ProductoSeguro
 from cotizador.models import CotizacionItem
 from core.models import FormaPagoChoices
 
+
 # ---------------------------------------------------------------------
 # Pólizas / Endosos / Renovaciones
 # ---------------------------------------------------------------------
@@ -42,7 +43,11 @@ class Poliza(TimeStampedModel, MoneyMixin):
     vigencia_desde = models.DateField(db_index=True)
     vigencia_hasta = models.DateField(db_index=True)
     estatus = models.CharField(max_length=12, choices=Estatus.choices, default=Estatus.EN_PROCESO, db_index=True)
-
+    prima_neta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    financiamiento = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gastos_expedicion = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    iva = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     prima_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     forma_pago = models.CharField(
         max_length=30,
@@ -80,19 +85,39 @@ class Poliza(TimeStampedModel, MoneyMixin):
         return f"{self.numero_poliza} ({self.aseguradora.nombre})"
 
 
-class Endoso(TimeStampedModel):
+class Endoso(models.Model):
+
     class Tipo(models.TextChoices):
-        CAMBIO_DATOS = "CAMBIO_DATOS", "Cambio de datos"
         CAMBIO_VEHICULO = "CAMBIO_VEHICULO", "Cambio de vehículo"
-        AUMENTO_COBERTURA = "AUMENTO_COBERTURA", "Aumento cobertura"
+        CAMBIO_COBERTURA = "CAMBIO_COBERTURA", "Cambio de cobertura"
+        CAMBIO_FORMA_PAGO = "CAMBIO_FORMA_PAGO", "Cambio de forma de pago"
+        CAMBIO_DATOS = "CAMBIO_DATOS", "Cambio de datos"
+        CANCELACION_PARCIAL = "CANCELACION_PARCIAL", "Cancelación parcial"
         OTRO = "OTRO", "Otro"
 
+    class Meta:
+        ordering = ["-fecha", "-id"]
+        verbose_name = "Endoso"
+        verbose_name_plural = "Endosos"
+
+    class Estatus(models.TextChoices):
+        BORRADOR = "BORRADOR", "Borrador"
+        APLICADO = "APLICADO", "Aplicado"
+        CANCELADO = "CANCELADO", "Cancelado"
+
     poliza = models.ForeignKey(Poliza, on_delete=models.CASCADE, related_name="endosos")
-    tipo_endoso = models.CharField(max_length=20, choices=Tipo.choices, db_index=True)
-    fecha = models.DateField(default=timezone.now, db_index=True)
-    descripcion = models.TextField(blank=True, default="")
-    prima_ajuste = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tipo_endoso = models.CharField(max_length=30, choices=Tipo.choices, db_index=True)
+    descripcion = models.TextField(blank=True,null=True)
+    prima_ajuste = models.DecimalField(max_digits=12, decimal_places=2,default=0)
+    fecha = models.DateField(default=timezone.now)
     documento = models.ForeignKey(Documento, on_delete=models.SET_NULL, null=True, blank=True, related_name="endosos")
+    estatus = models.CharField(max_length=20, choices=Estatus.choices, default=Estatus.APLICADO,
+        db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Endoso {self.get_tipo_endoso_display()} - Póliza {self.poliza_id}"
 
 
 class Renovacion(TimeStampedModel):
@@ -182,6 +207,14 @@ class PolizaEvento(models.Model):
         POLIZA_DOCUMENTO_ADJUNTADO = "POLIZA_DOCUMENTO_ADJUNTADO", "Documento de póliza adjuntado"
         POLIZA_VENCIDA = "POLIZA_VENCIDA", "Póliza Vencida"
         PAGO_COMPROBANTE_REEMPLAZADO = "PAGO_COMPROBANTE_REEMPLAZADO", "Comprobante reemplazado"
+        PAGO_RECORDATORIO_ENVIADO = "PAGO_RECORDATORIO_ENVIADO", "Recordatorio enviado"
+        ENDOSO = "ENDOSO", "Endoso aplicado"
+        ENDOSO_COMPROBANTE_ADJUNTADO = "ENDOSO_COMPROBANTE_ADJUNTADO", "Comprobante de Endoso adjuntado"
+        ENDOSO_ELIMINADO = "ENDOSO_ELIMINADO", "Endoso Eliminado"
+        ENDOSO_EDITADO = "ENDOSO_EDITADO", "Endoso Editado"
+        COMISION_GENERADA = "COMISION_GENERADA", "Comisión generada"
+        COMISION_PAGADA = "COMISION_PAGADA", "Comisión pagada"
+        COMISION_CANCELADA = "COMISION_CANCELADA", "Comisión cancelada"
 
     poliza = models.ForeignKey("polizas.Poliza", on_delete=models.CASCADE, related_name="eventos")
     tipo = models.CharField(max_length=40, choices=Tipo.choices, db_index=True)

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+{% load humanize %}
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 9px;
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .filters {
+    margin-top: 6px;
+    margin-bottom: 8px;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .filters td {
+    border: 1px solid #ddd;
+    padding: 5px;
+    background-color: #f8f9fa;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    table-layout: fixed;
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    vertical-align: middle;
+  }
+
+  th {
+    background-color: #eee;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .right {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .center {
+    text-align: center;
+  }
+
+  .summary td {
+    font-weight: bold;
+    background-color: #f3f3f3;
+  }
+</style>
+</head>
+<body>
+
+<h2>Reporte de Cobranza por Agente</h2>
+
+<table class="filters">
+  <tr>
+    <td>
+      {% if fecha_desde %}Desde: {{ fecha_desde|date:"d/m/Y" }} | {% endif %}
+      {% if fecha_hasta %}Hasta: {{ fecha_hasta|date:"d/m/Y" }}{% endif %}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr class="summary">
+    <td>Vencidos</td>
+    <td>{{ totales.cantidad_vencidos }}</td>
+    <td>Monto vencido|intcomma:2</td>
+    <td>{{ totales.monto_vencido|intcomma:2 }}</td>
+    <td>Por vencer</td>
+    <td>{{ totales.cantidad_por_vencer|intcomma:2 }}</td>
+    <td>Monto por vencer</td>
+    <td>{{ totales.monto_por_vencer|intcomma:2 }}</td>
+  </tr>
+  <tr class="summary">
+    <td>Cobrados</td>
+    <td>{{ totales.cantidad_cobrados }}</td>
+    <td>Monto cobrado</td>
+    <td>{{ totales.monto_cobrado|intcomma:2 }}</td>
+    <td colspan="4"></td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th width="22%">Agente</th>
+      <th width="8%">Vencidos</th>
+      <th width="12%">Monto vencido</th>
+      <th width="9%">Por vencer</th>
+      <th width="13%">Monto por vencer</th>
+      <th width="8%">Cobrados</th>
+      <th width="12%">Monto cobrado</th>
+      <th width="10%">Morosidad</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for r in reporte %}
+    <tr>
+      <td>{{ r.agente_nombre }}</td>
+      <td class="center">{{ r.cantidad_vencidos }}</td>
+      <td class="right">{{ r.monto_vencido|intcomma:2 }}</td>
+      <td class="center">{{ r.cantidad_por_vencer }}</td>
+      <td class="right">{{ r.monto_por_vencer|intcomma:2 }}</td>
+      <td class="center">{{ r.cantidad_cobrados }}</td>
+      <td class="right">{{ r.monto_cobrado|intcomma:2 }}</td>
+      <td class="right">{{ r.indice_morosidad }}%</td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="8" class="center">
+        No hay información disponible.
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

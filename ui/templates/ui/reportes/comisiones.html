@@ -1,0 +1,217 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <h3 class="mb-1">Reporte de Comisiones</h3>
+      <p class="text-muted mb-0">Consulta comisiones pagadas, pendientes y canceladas.</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+      </a>        
+      <a href="?{{ request.GET.urlencode }}&export=pdf" class="btn btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total pendiente</div>
+          <div class="fs-4 fw-bold text-warning">${{ total_pendiente }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total pagado</div>
+          <div class="fs-4 fw-bold text-success">${{ total_pagado }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total cancelado</div>
+          <div class="fs-4 fw-bold text-danger">${{ total_cancelado }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Registros</div>
+          <div class="fs-4 fw-bold">{{ total_registros }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get">
+        <div class="row g-3">
+
+          <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text"
+                   name="q"
+                   value="{{ q }}"
+                   class="form-control"
+                   placeholder="Póliza, cliente o agente">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Agente</label>
+            <select name="agente" class="form-select">
+              <option value="">Todos</option>
+              {% for a in agentes %}
+                <option value="{{ a.id }}" {% if agente_id == a.id|stringformat:"s" %}selected{% endif %}>
+                  {{ a }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Estatus</label>
+            <select name="estatus" class="form-select">
+              <option value="">Todos</option>
+              <option value="PENDIENTE" {% if estatus == "PENDIENTE" %}selected{% endif %}>Pendiente</option>
+              <option value="PAGADA" {% if estatus == "PAGADA" %}selected{% endif %}>Pagada</option>
+              <option value="CANCELADA" {% if estatus == "CANCELADA" %}selected{% endif %}>Cancelada</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" class="form-control">
+          </div>
+
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <a href="{% url 'ui:reporte_comisiones' %}" class="btn btn-outline-secondary">
+              Limpiar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              Filtrar
+            </button>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong>Detalle de comisiones</strong>
+      <span class="text-muted small">{{ total_registros }} registro(s)</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if comisiones %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Póliza</th>
+                <th>Cliente</th>
+                <th>Agente</th>
+                <th class="text-end">%</th>
+                <th class="text-end">Base</th>
+                <th class="text-end">Comisión</th>
+                <th>Estatus</th>
+                <th>Generación</th>
+                <th>Pago</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for c in comisiones %}
+              <tr>
+                <td>
+                  <a href="{% url 'ui:poliza_detail' c.poliza.pk %}" class="fw-semibold text-decoration-none">
+                    {{ c.poliza.numero_poliza|default:c.poliza.id }}
+                  </a>
+                </td>
+
+                <td>
+                  {% if c.poliza.cliente %}
+                    {{ c.poliza.cliente }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ c.agente }}</td>
+
+                <td class="text-end">{{ c.porcentaje }}%</td>
+
+                <td class="text-end">${{ c.base_calculo }}</td>
+
+                <td class="text-end fw-semibold">${{ c.monto_comision }}</td>
+
+                <td>
+                  {% if c.estatus == "PENDIENTE" %}
+                    <span class="badge text-bg-warning">Pendiente</span>
+                  {% elif c.estatus == "PAGADA" %}
+                    <span class="badge text-bg-success">Pagada</span>
+                  {% elif c.estatus == "CANCELADA" %}
+                    <span class="badge text-bg-danger">Cancelada</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">{{ c.get_estatus_display }}</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ c.fecha_generacion|date:"d/m/Y" }}</td>
+
+                <td>
+                  {% if c.fecha_pago %}
+                    {{ c.fecha_pago|date:"d/m/Y" }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-end">
+                  <a href="{% url 'ui:poliza_detail' c.poliza.pk %}" class="btn btn-sm btn-outline-primary">
+                    Ver póliza
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-cash-coin fs-3"></i>
+          <div class="fw-semibold mt-2">No hay comisiones para mostrar</div>
+          <div class="small">Ajusta los filtros o genera nuevas comisiones.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

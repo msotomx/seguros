@@ -17,9 +17,10 @@
 
     <div class="d-flex gap-2">
       {% if poliza.documento_id %}
-        {# Si no existe esta URL, quita este botón #}
-        <a href="" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-file-earmark-text me-1"></i> Ver documento
+        <a href="{% url 'documentos:ver_documento' poliza.documento.id %}"
+          target="_blank"
+          class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-file-earmark-text me-1"></i>Ver Póliza PDF
         </a>
       {% endif %}
 
@@ -101,7 +102,7 @@
           <!-- BOTON RENOVAR -->
           {% if poliza.estatus == "VIGENTE" or poliza.estatus == "VENCIDA" %}
             <form method="post" action="{% url 'ui:poliza_renovar' poliza.pk %}" class="d-inline"
-                    onsubmit="return confirm('¿Crear renovación de esta póliza? Se generará una nueva póliza EN PROCESO con nueva vigencia.')">
+                onsubmit="return confirm('¿Crear renovación de esta póliza? Se generará una nueva póliza EN PROCESO con nueva vigencia.')">            
                 {% csrf_token %}
                 <button class="btn btn-outline-primary" type="submit">
                 <i class="bi bi-arrow-repeat me-1"></i> Renovar
@@ -114,7 +115,16 @@
                   <i class="bi bi-paperclip me-1"></i>
                   {% if poliza.documento_id %}Reemplazar PDF{% else %}Adjuntar PDF{% endif %}
           </button>
- 
+          <!-- BOTON ENDOSO -->
+          {% if poliza.estatus == "VIGENTE"%}
+            <form method="post" action="{% url 'ui:endoso_create' poliza.id %}" class="d-inline">
+                {% csrf_token %}
+                <button class="btn btn-outline-primary" type="submit">
+                <i class="bi bi-pencil-square"></i> Endoso
+                </button>
+            </form>
+          {% endif %}
+
         </div>
       </div>
       {% if poliza.numero_poliza|default:''|slice:":5" == "TEMP-" %}
@@ -125,6 +135,17 @@
 
     </div>
   </div>
+
+  <!-- Banner Inteligente al inicio de Poliza -->
+  {% if estado_cuenta.total_vencido > 0 %}
+    <div class="alert alert-danger">
+      Esta póliza tiene pagos vencidos por $ {{ estado_cuenta.total_vencido }}.
+    </div>
+  {% elif estado_cuenta.total_pendiente > 0 %}
+    <div class="alert alert-warning">
+      Hay pagos pendientes por $ {{ estado_cuenta.total_pendiente }}.
+    </div>
+  {% endif %}
 
   <!-- Summary cards -->
   <div class="row g-3 mb-3">
@@ -561,8 +582,131 @@
   </div>
   <!-- Fin de Resumen Financiero -->
 
+  <!-- Estado de Cuenta -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <h6 class="mb-0">Estado de cuenta</h6>
+      <hr class="my-2">
+
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="small text-muted">Total programado</div>
+          <div class="fw-semibold">$ {{ estado_cuenta.total_programado }}</div>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Pagado</div>
+          <div class="fw-semibold text-success">$ {{ estado_cuenta.total_pagado }}</div>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Pendiente</div>
+          <div class="fw-semibold text-warning">$ {{ estado_cuenta.total_pendiente }}</div>
+        </div>
+        <div class="col-md-3">
+          <div class="small text-muted">Vencido</div>
+          <div class="fw-semibold text-danger">$ {{ estado_cuenta.total_vencido }}</div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <div class="small text-muted">Saldo</div>
+        <div class="fs-5 fw-bold">$ {{ estado_cuenta.saldo }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalle de Movimientos Despues del Estado de Cuenta -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <h6 class="mb-0">Movimientos de cuenta</h6>
+      <hr class="my-2">
+
+      {% if pagos_estado_cuenta %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead>
+              <tr>
+                <th>Pago</th>
+                <th>Fecha programada</th>
+                <th>Vencimiento</th>
+                <th>Monto</th>
+                <th>Pagado</th>
+                <th>Estatus</th>
+                <th>Referencia</th>
+                <th> </th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in pagos_estado_cuenta %}
+                <tr class="{% if p.estatus == 'VENCIDO' %}table-danger{% elif p.estatus == 'PARCIAL' %}table-warning{% endif %}">
+                  <td>#{{ p.id }}</td>
+                  <td>{{ p.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+                  <td>{{ p.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+                  <td>{{ p.moneda }} {{ p.monto }}</td>
+                  <td>
+                    {% if p.monto_pagado %}
+                      {{ p.moneda }} {{ p.monto_pagado }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge
+                      {% if p.estatus == 'PAGADO' %}bg-success
+                      {% elif p.estatus == 'VENCIDO' %}bg-danger
+                      {% elif p.estatus == 'PARCIAL' %}bg-warning text-dark
+                      {% else %}bg-secondary{% endif %}">
+                      {{ p.get_estatus_display }}
+                    </span>
+                  </td>
+                  <td>{{ p.referencia|default:"-" }}</td>
+                  <!-- Botones: Pagar y Recordatorio por Whatsapp -->
+                  <td class="text-end">
+                    <div class="d-flex gap-2 justify-content-end flex-wrap">
+
+                      {% if p.estatus != "PAGADO" %}
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalMarcarPagado2"
+                        data-pago-id="{{ p.pk }}"
+                        data-poliza="{{ p.poliza.numero_poliza }}"
+                        data-cliente="{{ p.poliza.cliente }}"
+                        data-monto="{{ p.monto|floatformat:2 }}"
+                        data-fecha="{{ p.fecha_programada|date:'Y-m-d' }}"
+                      >
+                        <i class="bi bi-check2-circle me-1"></i> Confirmar pago manual
+                      </button>
+
+                      <form method="post" action="{% url 'ui:pago_enviar_recordatorio_whatsapp' p.id %}">
+                          {% csrf_token %}
+                          <button class="btn btn-sm btn-outline-success">
+                            WhatsApp
+                          </button>
+                        </form>
+                      {% endif %}
+
+                      {% if p.comprobante %}
+                        <a href="{% url 'documentos:download' p.comprobante_id %}" class="btn btn-sm btn-outline-secondary">
+                          Ver Comprobante
+                        </a>
+                      {% endif %}
+
+                    </div>
+                  </td>                  
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-muted">No hay movimientos de cuenta.</div>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Documento -->
-  <div class="card shadow-sm">
+  <div class="card shadow-sm mt-3">
     <div class="card-body">
       <h6 class="mb-0">Documento</h6>
       <hr class="my-2">
@@ -575,11 +719,13 @@
           </div>
 
           {% if poliza.documento_id %}
-            {# Si no existe esta URL, quita este botón #}
-            <a href="" class="btn btn-outline-primary">
-              <i class="bi bi-box-arrow-up-right me-1"></i> Abrir
+            <a href="{% url 'documentos:ver_documento' poliza.documento.id %}"
+              target="_blank"
+              class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-file-earmark-text me-1"></i>Ver Póliza PDF
             </a>
           {% endif %}
+
         </div>
       {% else %}
         <div class="text-muted">
@@ -592,6 +738,409 @@
     </div>
   </div>
 
+  <!-- Endosos -->
+  <div class="card shadow-sm border-1 mt-4">
+
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">  <!-- bg-light -->
+        <div>
+            <strong>Endosos</strong>
+            <span class="text-muted ms-2">({{ poliza.endosos.count }})</span>
+        </div>
+
+        <a href="{% url 'ui:endoso_create' poliza.pk %}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-circle me-1"></i> Nuevo Endoso
+        </a>
+    </div>
+
+    <div class="card-body p-0">
+
+        {% if poliza.endosos.exists %}
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+
+                <!-- 🔹 ENCABEZADO -->
+                <thead class="table-white"> <!-- light-->
+                    <tr>
+                        <th style="min-width: 180px;">Tipo</th>
+                        <th style="min-width: 110px;">Fecha</th>
+                        <th style="min-width: 140px;" class="text-end">Ajuste Prima</th>
+                        <th>Descripción</th>
+                        <th style="min-width: 160px;" class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+
+                <!-- 🔹 DETALLE -->
+                <tbody>
+                    {% for e in poliza.endosos.all %}
+                    <tr>
+
+                        <!-- Tipo -->
+                        <td>
+                          {% if e.tipo_endoso == "CANCELACION_PARCIAL" %}
+                              <span class="badge bg-danger">Cancelación</span>
+                          {% elif e.tipo_endoso == "CAMBIO_COBERTURA" %}
+                              <span class="badge bg-warning text-dark">Cobertura</span>
+                          {% elif e.tipo_endoso == "CAMBIO_VEHICULO" %}
+                              <span class="badge bg-info text-dark">Vehículo</span>
+                          {% elif e.tipo_endoso == "CAMBIO_DATOS" %}
+                              <span class="badge bg-secondary">Datos</span>
+                          {% elif e.tipo_endoso == "CAMBIO_FORMA_PAGO" %}
+                              <span class="badge bg-secondary">Forma de Pago</span>
+                          {% else %}
+                              <span class="badge bg-dark">Otro</span>
+                          {% endif %}
+                        </td>
+
+                        <!-- Fecha -->
+                        <td>
+                            {{ e.fecha|date:"d/m/Y" }}
+                        </td>
+
+                        <!-- Prima -->
+                        <td class="text-end">
+                            {% if e.prima_ajuste > 0 %}
+                                <span class="text-success fw-semibold">+{{ e.prima_ajuste }}</span>
+                            {% elif e.prima_ajuste < 0 %}
+                                <span class="text-danger fw-semibold">{{ e.prima_ajuste }}</span>
+                            {% else %}
+                                <span class="text-muted">0.00</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Descripción -->
+                        <td>
+                            {% if e.descripcion %}
+                                {{ e.descripcion|truncatechars:80 }}
+                            {% else %}
+                                <span class="text-muted">Sin descripción</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+
+                                <!-- Ver PDF -->
+                                {% if e.documento_id and e.documento.file %}
+                                <a href="{% url 'documentos:ver_documento' e.documento.id %}"
+                                   target="_blank"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye me-1"></i>Ver PDF
+                                </a>
+                                {% endif %}
+                              
+                                <!-- Subir/Reemplazar -->
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalSubirEndosoPdf{{ e.id }}">
+                                    <i class="bi bi-paperclip me-1"></i>
+                                    {% if e.documento_id %}Reemplazar{% else %}Adjuntar{% endif %}
+                                </button>
+                                <a href="{% url 'ui:endoso_update' e.id %}"
+                                  class="btn btn-sm btn-outline-warning">
+                                    <i class="bi bi-pencil me-1"></i>Editar
+                                </a>
+
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalEliminarEndoso{{ e.id }}">
+                                    <i class="bi bi-trash me-1"></i>Eliminar
+                                </button>
+
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    <!-- 🔹 MODAL -->
+                    <div class="modal fade" id="modalSubirEndosoPdf{{ e.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+
+                                <form method="post"
+                                      enctype="multipart/form-data"
+                                      action="{% url 'documentos:subir_endoso_pdf' e.id %}">
+                                    {% csrf_token %}
+
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">
+                                            {% if e.documento_id %}Reemplazar PDF{% else %}Adjuntar PDF{% endif %}
+                                            — {{ e.get_tipo_endoso_display }}
+                                        </h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+
+                                    <div class="modal-body">
+                                        <input type="file"
+                                               name="archivo"
+                                               class="form-control"
+                                               accept="application/pdf"
+                                               required>
+                                    </div>
+
+                                    <div class="modal-footer">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary"
+                                                data-bs-dismiss="modal">
+                                            Cancelar
+                                        </button>
+                                        <button type="submit"
+                                                class="btn btn-primary">
+                                            Guardar
+                                        </button>
+                                    </div>
+
+                                </form>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal para Cancelar Endoso -->
+                    <div class="modal fade" id="modalEliminarEndoso{{ e.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'ui:endoso_delete' e.id %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Eliminar endoso</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="mb-2">
+                                            ¿Seguro que deseas eliminar este endoso?
+                                        </p>
+                                        <div class="small text-muted">
+                                            <div><strong>Tipo:</strong> {{ e.get_tipo_endoso_display }}</div>
+                                            <div><strong>Fecha:</strong> {{ e.fecha|date:"d/m/Y" }}</div>
+                                            <div><strong>Ajuste:</strong> {{ e.prima_ajuste }}</div>
+                                        </div>
+                                        {% if e.documento_id %}
+                                            <div class="alert alert-warning mt-3 mb-0">
+                                                Este endoso tiene un documento relacionado. Al eliminar el endoso se eliminará también el documento asociado.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+
+        {% else %}
+
+        <!-- 🔹 SIN ENDOSOS -->
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-file-earmark-text fs-3"></i>
+            <div class="fw-semibold mt-2">No hay endosos registrados</div>
+            <div class="small">Cuando captures uno aparecerá aquí.</div>
+        </div>
+
+        {% endif %}
+
+    </div>
+  </div>
+
+  <!-- Comisiones -->
+  <div class="card shadow-sm border-0 mt-4">
+      <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <div>
+              <strong>Comisión</strong>
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap">
+              {% if comision %}
+                  {% if comision.estatus == "PENDIENTE" %}
+                      <button type="button"
+                              class="btn btn-sm btn-outline-success"
+                              data-bs-toggle="modal"
+                              data-bs-target="#modalMarcarComisionPagada">
+                          <i class="bi bi-check2-circle me-1"></i> Marcar pagada
+                      </button>
+                  {% endif %}
+              {% else %}
+                  <form method="post" action="{% url 'ui:comision_generar' poliza.id %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-primary">
+                          <i class="bi bi-cash-coin me-1"></i> Generar comisión
+                      </button>
+                  </form>
+              {% endif %}
+          </div>
+      </div>
+
+      <div class="card-body">
+          {% if comision %}
+              <div class="row g-3">
+                  <div class="col-md-4">
+                      <label class="form-label text-muted small mb-1">Agente</label>
+                      <div class="fw-semibold">
+                          {{ comision.agente }}
+                      </div>
+                  </div>
+
+                  <div class="col-md-2">
+                      <label class="form-label text-muted small mb-1">Porcentaje</label>
+                      <div class="fw-semibold">
+                          {{ comision.porcentaje }}%
+                      </div>
+                  </div>
+
+                  <div class="col-md-3">
+                      <label class="form-label text-muted small mb-1">Base cálculo</label>
+                      <div class="fw-semibold">
+                          {{ comision.base_calculo }}
+                      </div>
+                  </div>
+
+                  <div class="col-md-3">
+                      <label class="form-label text-muted small mb-1">Monto comisión</label>
+                      <div class="fw-semibold">
+                          {{ comision.monto_comision }}
+                      </div>
+                  </div>
+
+                  <div class="col-md-4">
+                      <label class="form-label text-muted small mb-1">Estatus</label>
+                      <div>
+                          {% if comision.estatus == "PENDIENTE" %}
+                              <span class="badge text-bg-warning">Pendiente</span>
+                          {% elif comision.estatus == "PAGADA" %}
+                              <span class="badge text-bg-success">Pagada</span>
+                          {% elif comision.estatus == "CANCELADA" %}
+                              <span class="badge text-bg-danger">Cancelada</span>
+                          {% else %}
+                              <span class="badge text-bg-secondary">{{ comision.get_estatus_display }}</span>
+                          {% endif %}
+                      </div>
+                  </div>
+
+                  <div class="col-md-4">
+                      <label class="form-label text-muted small mb-1">Fecha generación</label>
+                      <div class="fw-semibold">
+                          {{ comision.fecha_generacion|date:"d/m/Y" }}
+                      </div>
+                  </div>
+
+                  <div class="col-md-4">
+                      <label class="form-label text-muted small mb-1">Fecha pago</label>
+                      <div class="fw-semibold">
+                          {% if comision.fecha_pago %}
+                              {{ comision.fecha_pago|date:"d/m/Y" }}
+                          {% else %}
+                              <span class="text-muted">—</span>
+                          {% endif %}
+                      </div>
+                  </div>
+
+                  {% if comision.notas %}
+                  <div class="col-12">
+                      <label class="form-label text-muted small mb-1">Notas</label>
+                      <div class="text-muted">
+                          {{ comision.notas }}
+                      </div>
+                  </div>
+                  {% endif %}
+              </div>
+          {% else %}
+              <div class="text-center text-muted py-3">
+                  <div class="mb-2">
+                      <i class="bi bi-cash-coin fs-3"></i>
+                  </div>
+                  <div class="fw-semibold">No hay comisión generada</div>
+                  <div class="small">Puedes generarla desde aquí cuando la póliza cumpla la regla de negocio.</div>
+              </div>
+          {% endif %}
+      </div>
+    <!-- Modal para Marcar Comision Pagada -->
+    {% if comision and comision.estatus == "PENDIENTE" %}
+    <div class="modal fade" id="modalMarcarComisionPagada" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" action="{% url 'ui:comision_marcar_pagada' comision.id %}">
+                    {% csrf_token %}
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">Marcar comisión como pagada</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <p class="mb-3">
+                            ¿Confirmas que esta comisión ya fue pagada?
+                        </p>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small mb-1">Agente</label>
+                                <div class="fw-semibold">{{ comision.agente }}</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small mb-1">Monto comisión</label>
+                                <div class="fw-semibold">{{ comision.monto_comision }}</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small mb-1">Porcentaje</label>
+                                <div class="fw-semibold">{{ comision.porcentaje }}%</div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small mb-1">Base cálculo</label>
+                                <div class="fw-semibold">{{ comision.base_calculo }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="id_fecha_pago_comision" class="form-label">Fecha de pago</label>
+                                <input type="date"
+                                      name="fecha_pago"
+                                      id="id_fecha_pago_comision"
+                                      class="form-control"
+                                      value="{{ hoy|date:'Y-m-d' }}"
+                                      required>
+                            </div>
+
+                        </div>
+
+                        <div class="mb-0">
+                            <label for="id_notas_comision" class="form-label">Notas</label>
+                            <textarea name="notas"
+                                      id="id_notas_comision"
+                                      rows="3"
+                                      class="form-control"
+                                      placeholder="Opcional. Ejemplo: Transferencia realizada el 22/04/2026."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            Confirmar pago
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %} <!-- Fin del Modal Marcar Comision Pagada -->
+
+  </div>
+
+  
   <!-- Bitacora de Eventos -->
   <div class="card shadow-sm mt-3">
     <div class="card-body">
@@ -654,7 +1203,7 @@
                             </span>
 
                         {% else %}
-                            {{ e.titulo|default:e.get_tipo_display }}
+                                {{ e.titulo|default:e.get_tipo_display }}
                         {% endif %}
 
                         </div>
@@ -813,6 +1362,62 @@
   </div>
 </div>
 
+<!-- Modal para marcar pagado  -->
+ <div class="modal fade" id="modalMarcarPagado2" tabindex="-1" aria-labelledby="modalMarcarPagadoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="formMarcarPagado" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalMarcarPagadoLabel">Confirmar Pago Manual</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-2">
+            <div class="text-muted small">Póliza</div>
+            <div class="fw-semibold" id="mp_poliza">—</div>
+            <div class="text-muted small" id="mp_cliente">—</div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small">Monto</span>
+            <span class="badge bg-success-subtle text-success" id="mp_monto">$0.00</span>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Fecha de pago</label>
+              <input type="date" name="fecha_pago" id="mp_fecha_pago" class="form-control" required>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="form-label">Método</label>
+              <input type="text" name="metodo" class="form-control" placeholder="Ej. Transferencia / Efectivo">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Referencia</label>
+              <input type="text" name="referencia" class="form-control" placeholder="Folio / autorización / referencia bancaria">
+            </div>
+          </div>
+
+          <div class="form-text mt-2">
+            Esto cambiará el estatus del pago a <strong>PAGADO</strong> cuando el cobro haya sido recibido fuera del portal.
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">
+            <i class="bi bi-check2-circle me-1"></i> Confirmar pago
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script>
   function copyToClipboard(text) {
     if (!text) return;
@@ -858,6 +1463,39 @@
 
     hastaInput.value = `${yyyy}-${mm}-${dd}`;
   }
+</script>
+<!-- script para el modal de marcar como pagado -->
+<script>
+  (function () {
+    const modal = document.getElementById('modalMarcarPagado2');
+    const form = document.getElementById('formMarcarPagado');
+
+    const elPoliza = document.getElementById('mp_poliza');
+    const elCliente = document.getElementById('mp_cliente');
+    const elMonto = document.getElementById('mp_monto');
+    const elFechaPago = document.getElementById('mp_fecha_pago');
+
+    modal.addEventListener('show.bs.modal', function (event) {
+      const btn = event.relatedTarget;
+
+      const pagoId = btn.getAttribute('data-pago-id');
+      const poliza = btn.getAttribute('data-poliza') || '—';
+      const cliente = btn.getAttribute('data-cliente') || '';
+      const monto = btn.getAttribute('data-monto') || '0.00';
+      const fecha = btn.getAttribute('data-fecha') || '';
+
+      // labels
+      elPoliza.textContent = poliza;
+      elCliente.textContent = cliente;
+      elMonto.textContent = '$' + monto;
+
+      // default date: hoy o fecha programada (aquí usamos fecha programada)
+      elFechaPago.value = fecha;
+
+      // set form action ->  /ui/pagos/<id>/marcar-pagado/
+      form.action = "{% url 'ui:pago_marcar_pagado' 0 %}".replace("/0/", "/" + pagoId + "/");
+    });
+  })();
 </script>
 
 {% endblock %}

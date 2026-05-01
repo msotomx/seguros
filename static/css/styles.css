@@ -1,0 +1,73 @@
+/* =========================
+   BASE
+========================= */
+body {
+  background-color: #f8f9fa;
+}
+
+/* =========================
+   LAYOUT
+========================= */
+.page-title {
+  font-weight: 600;
+}
+
+/* =========================
+   TABLES
+========================= */
+.table-erp td,
+.table-erp th {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.table-erp thead th {
+  white-space: nowrap;
+}
+
+/* =========================
+   FORMS
+========================= */
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* =========================
+   DASHBOARD
+========================= */
+.kpi-card .card-body {
+  padding: 1rem;
+}
+
+.kpi-label {
+  color: #6c757d;
+  font-size: 0.82rem;
+}
+
+.kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+/* =========================
+   COBRANZA
+========================= */
+.badge-vencido {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.badge-por-vencer {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.row-vencido {
+  background-color: rgba(220, 53, 69, 0.08);
+}
+
+.row-parcial {
+  background-color: rgba(255, 193, 7, 0.12);
+}

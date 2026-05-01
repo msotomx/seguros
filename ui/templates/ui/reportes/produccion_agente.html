@@ -1,0 +1,199 @@
+{% extends "ui/base.html" %}
+{% load humanize %}
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <h3 class="mb-1">Reporte de Producción por Agente</h3>
+      <p class="text-muted mb-0">
+        Consulta pólizas emitidas, primas y comisiones generadas por agente.
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="?{{ request.GET.urlencode }}&export=excel" class="btn btn-outline-success">
+        <i class="bi bi-file-earmark-excel me-1"></i> Excel
+      </a>
+      <a href="?{{ request.GET.urlencode }}&export=pdf" class="btn btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Agentes con producción</div>
+          <div class="fs-4 fw-bold">{{ total_agentes }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Pólizas</div>
+          <div class="fs-4 fw-bold">{{ total_polizas }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Prima total</div>
+          <div class="fs-4 fw-bold text-primary">${{ total_prima_total|intcomma:2 }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Comisiones generadas</div>
+          <div class="fs-4 fw-bold text-success">${{ total_comisiones|intcomma:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get">
+        <div class="row g-3">
+
+          <div class="col-md-3">
+            <label class="form-label">Agente</label>
+            <select name="agente" class="form-select">
+              <option value="">Todos</option>
+              {% for a in agentes %}
+                <option value="{{ a.id }}" {% if agente_id == a.id|stringformat:"s" %}selected{% endif %}>
+                  {{ a }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Estatus póliza</label>
+            <select name="estatus" class="form-select">
+              <option value="">Todos</option>
+              <option value="EN_PROCESO" {% if estatus == "EN_PROCESO" %}selected{% endif %}>En proceso</option>
+              <option value="VIGENTE" {% if estatus == "VIGENTE" %}selected{% endif %}>Vigente</option>
+              <option value="VENCIDA" {% if estatus == "VENCIDA" %}selected{% endif %}>Vencida</option>
+              <option value="CANCELADA" {% if estatus == "CANCELADA" %}selected{% endif %}>Cancelada</option>
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" class="form-control">
+          </div>
+
+          <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary">
+              Filtrar
+            </button>
+            <a href="{% url 'ui:reporte_produccion_agente' %}" class="btn btn-outline-secondary">
+              Limpiar
+            </a>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong>Producción por agente</strong>
+      <span class="text-muted small">{{ total_agentes }} agente(s)</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if filas %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Agente</th>
+                <th class="text-end">Pólizas</th>
+                <th class="text-end">Prima neta</th>
+                <th class="text-end">Prima total</th>
+                <th class="text-end">Comisiones generadas</th>
+                <th class="text-end">Comisiones pagadas</th>
+                <th class="text-end">Comisiones pendientes</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for r in filas %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ r.agente_nombre }}</div>
+                  <div class="small text-muted">ID agente: {{ r.agente_id }}</div>
+                </td>
+
+                <td class="text-end fw-semibold">
+                  {{ r.polizas_count }}
+                </td>
+
+                <td class="text-end">
+                  ${{ r.prima_neta_total }}
+                </td>
+
+                <td class="text-end fw-semibold">
+                  ${{ r.prima_total_total }}
+                </td>
+
+                <td class="text-end">
+                  ${{ r.com_generadas }}
+                </td>
+
+                <td class="text-end text-success fw-semibold">
+                  ${{ r.com_pagadas }}
+                </td>
+
+                <td class="text-end text-warning fw-semibold">
+                  ${{ r.com_pendientes }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+
+            <tfoot class="table-light">
+              <tr>
+                <th>Total</th>
+                <th class="text-end">{{ total_polizas }}</th>
+                <th class="text-end">${{ total_prima_neta }}</th>
+                <th class="text-end">${{ total_prima_total }}</th>
+                <th class="text-end">${{ total_comisiones }}</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </tfoot>
+
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-bar-chart-line fs-3"></i>
+          <div class="fw-semibold mt-2">No hay producción para mostrar</div>
+          <div class="small">Ajusta los filtros o registra pólizas para los agentes.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

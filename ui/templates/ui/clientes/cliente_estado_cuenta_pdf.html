@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Estado de cuenta</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 12mm 15mm 12mm;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #222;
+    }
+
+    .header {
+      margin-bottom: 18px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: #666;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 4px;
+    }
+
+    .grid {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .grid td {
+      padding: 5px 8px;
+      vertical-align: top;
+    }
+
+    .summary {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+    }
+
+    .summary td {
+      width: 20%;
+      border: 1px solid #ddd;
+      padding: 8px;
+    }
+
+    .label {
+      font-size: 10px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+
+    .value {
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .value.success { color: #198754; }
+    .value.warning { color: #b78103; }
+    .value.danger { color: #dc3545; }
+
+    table.movs {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 10px;
+    }
+
+    table.movs th,
+    table.movs td {
+      border: 1px solid #ddd;
+      padding: 6px 7px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    table.movs th {
+      background: #f4f4f4;
+      font-weight: bold;
+    }
+
+    .text-right {
+      text-align: right;
+    }
+
+    .muted {
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">Estado de cuenta del cliente</div>
+    <div class="subtitle">
+      Cliente: {{ cliente.nombre_mostrar }} | RFC: {{ cliente.rfc|default:"-" }}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Datos del cliente</div>
+    <table class="grid">
+      <tr>
+        <td><strong>Nombre:</strong> {{ cliente.nombre_mostrar }}</td>
+        <td><strong>Email:</strong> {{ cliente.email_principal|default:"-" }}</td>
+      </tr>
+      <tr>
+        <td><strong>Teléfono:</strong> {{ cliente.telefono_principal|default:"-" }}</td>
+        <td><strong>Estatus:</strong> {{ cliente.get_estatus_display }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Resumen</div>
+    <table class="summary">
+      <tr>
+        <td>
+          <div class="label">Total programado</div>
+          <div class="value">$ {{ estado_cuenta_cliente.total_programado }}</div>
+        </td>
+        <td>
+          <div class="label">Pagado</div>
+          <div class="value success">$ {{ estado_cuenta_cliente.total_pagado }}</div>
+        </td>
+        <td>
+          <div class="label">Pendiente</div>
+          <div class="value warning">$ {{ estado_cuenta_cliente.total_pendiente }}</div>
+        </td>
+        <td>
+          <div class="label">Vencido</div>
+          <div class="value danger">$ {{ estado_cuenta_cliente.total_vencido }}</div>
+        </td>
+        <td>
+          <div class="label">Saldo</div>
+          <div class="value">$ {{ estado_cuenta_cliente.saldo }}</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Detalle de movimientos</div>
+
+    {% if pagos_estado_cuenta_cliente %}
+      <table class="movs">
+        <thead>
+          <tr>
+            <th>Póliza</th>
+            <th>Aseguradora</th>
+            <th>Programada</th>
+            <th>Vencimiento</th>
+            <th>Monto</th>
+            <th>Pagado</th>
+            <th>Estatus</th>
+            <th>Referencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in pagos_estado_cuenta_cliente %}
+            <tr>
+              <td>{{ p.poliza.numero_poliza|default:"-" }}</td>
+              <td>{{ p.poliza.aseguradora.nombre|default:"-" }}</td>
+              <td>{{ p.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+              <td>{{ p.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+              <td class="text-right">{{ p.moneda }} {{ p.monto }}</td>
+              <td class="text-right">
+                {% if p.monto_pagado %}
+                  {{ p.moneda }} {{ p.monto_pagado }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ p.get_estatus_display }}</td>
+              <td>{{ p.referencia|default:"-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="muted">No hay movimientos de cuenta.</div>
+    {% endif %}
+  </div>
+
+</body>
+</html>

@@ -168,14 +168,17 @@
 
                 <td class="text-end pe-3">
                   <a class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.8rem;" href="{% url 'ui:poliza_detail' p.pk %}">
-                    Ver
+                    Ver Póliza
                   </a>
                   <!-- BOTON DOCUMENTO -->
                   {% if p.documento_id %}
-                    <a class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.8rem;" href="">
-                      Documento
+                    <a href="{% url 'documentos:ver_documento' p.documento.id %}"
+                      target="_blank"
+                      class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.8rem;">
+                        Documento
                     </a>
                   {% endif %}
+
                 </td>
               </tr>
             {% endfor %}

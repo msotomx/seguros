@@ -33,7 +33,7 @@
             <a href="{% url 'ui:poliza_list' %}?estatus=VIGENTE" class="dashboard-card-link">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-body">
-                        <div class="text-muted small">Pólizas Vigentes</div>
+                        <div class="text-muted small"><strong>Pólizas Vigentes</strong></div>
                         <div class="fs-3 fw-bold">{{ polizas_kpi.vigentes|intcomma }}</div>
                         <div class="small text-muted">
                         En proceso: {{ polizas_kpi.en_proceso|intcomma }}
@@ -47,7 +47,7 @@
         <a href="{% url 'ui:poliza_list' %}?vencen=30" class="dashboard-card-link">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Pólizas por vencer (30 días)</div>
+                    <div class="text-muted small"><strong>Pólizas por vencer (30 días)</strong></div>
                     <div class="fs-3 fw-bold text-warning">{{ polizas_kpi.por_vencer_30d|intcomma }}</div>
                     <div class="small text-muted">
                         Vencidas: {{ polizas_kpi.vencidas|intcomma }}
@@ -61,7 +61,7 @@
         <a href="{% url 'ui:pago_list' %}?estatus=PENDIENTE" class="dashboard-card-link">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Pagos Pendientes</div>
+                    <div class="text-muted small"><strong>Pagos Pendientes</strong></div>
                     <div class="fs-3 fw-bold">{{ pagos_kpi.pendientes|intcomma }}</div>
                     <div class="small text-muted">
                         Monto: ${{ pagos_kpi.monto_pendiente|floatformat:2|intcomma }}
@@ -75,7 +75,7 @@
         <a href="{% url 'ui:pago_list' %}?estatus=VENCIDO" class="dashboard-card-link">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Pagos Vencidos</div>
+                    <div class="text-muted small"><strong>Pagos Vencidos</strong></div>
                     <div class="fs-3 fw-bold text-danger">{{ pagos_kpi.vencidos|intcomma }}</div>
                     <div class="small text-muted">
                         Monto: ${{ pagos_kpi.monto_vencido|floatformat:2|intcomma }}
@@ -84,12 +84,14 @@
             </div>
         </a>
     </div>
+  </div>
 
+  <div class="row g-3 mb-4">
     <div class="col-md-3">
         <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                    <div class="text-muted small">Pagos Cobrados (30 días)</div>
+                    <div class="text-muted small"><strong>Pagos Cobrados (30 días)</strong></div>
                     <div class="fs-3 fw-bold text-success">${{ pagos_kpi.monto_pagado_30d|floatformat:2|intcomma }}</div>
                     <div class="small text-muted">
                         {{ pagos_kpi.pagos_pagados_30d|intcomma }} pagos
@@ -101,12 +103,29 @@
     </div>
 
     <div class="col-md-3">
+        <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small"><strong>Comisiones Pendientes</strong></div>
+                    <div class="fs-3 fw-bold text-success">
+                      ${{ comisiones_kpi.monto_pendiente|floatformat:2|intcomma }}
+                    </div>
+                    <div class="small text-muted">
+                        Comisiones: {{ comisiones_kpi.pendientes }}
+                    </div>
+                </div>
+
+            </div>
+        </a>
+    </div>
+
+    <div class="col-md-3">
       <div class="card shadow-sm border-0">
         <div class="card-body">
-          <div class="text-muted small">Comisiones Pendientes</div>
-          <div class="fs-3 fw-bold">{{ comisiones_kpi.pendientes|intcomma }}</div>
+          <div class="text-muted small"><strong>Comisiones Pagadas (30 días)</strong></div>
+          <div class="fs-3 fw-bold">${{ comisiones_kpi.monto_pagado_30d|intcomma }}</div>
           <div class="small text-muted">
-            Monto: ${{ comisiones_kpi.monto_pendiente|floatformat:2|intcomma }}
+             Comisiones: {{ comisiones_kpi.pagadas_30d }} 
           </div>
         </div>
       </div>
@@ -116,7 +135,7 @@
         <a href="{% url 'ui:cliente_list' %}" class="dashboard-card-link">
             <div class="card shadow-sm border-0">
                 <div class="card-body">
-                <div class="text-muted small">Clientes Totales</div>
+                <div class="text-muted small"><strong>Clientes Totales</strong></div>
                 <div class="fs-3 fw-bold">{{ clientes_kpi.total|intcomma }}</div>
                 {% if clientes_kpi.nuevos_30d != None %}
                     <div class="small text-muted">
@@ -138,7 +157,7 @@
         <div class="card-header bg-white fw-semibold">Pagos próximos a vencer (7 días)</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>Fecha</th>
@@ -172,7 +191,7 @@
         <div class="card-header bg-white fw-semibold">Pólizas próximas a vencer (30 días)</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>Vigencia hasta</th>
@@ -203,7 +222,7 @@
 
   </div>
 
-  <!-- Últimas pólizas + actividad -->
+  <!-- Últimas pólizas + Comisiones -->
   <div class="row g-4">
 
     <div class="col-lg-6">
@@ -211,7 +230,7 @@
         <div class="card-header bg-white fw-semibold">Últimas pólizas emitidas</div>
         <div class="card-body p-0">
           <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0">
+            <table class="table table-sm table-hover mb-0 table-erp">
               <thead class="table-light">
                 <tr>
                   <th>No. póliza</th>
@@ -242,15 +261,53 @@
       </div>
     </div>
 
+    <!-- Ultimas Comisiones -->
     <div class="col-lg-6">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-semibold">Últimas Comisiones</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0 table-erp">
+              <thead class="table-light">
+                <tr>
+                  <th>No. póliza</th>
+                  <th>Agente</th>
+                  <th>Comisión</th>
+                  <th>Estatus</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in ultimas_comisiones %}
+                <tr>
+                  <td>{{ p.poliza }}</td>
+                  <td>{{ p.agente|default:"-" }}</td>
+                  <td>{{ p.monto_comision|intcomma:2 }}</td>
+                  <td>{{ p.estatus }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">Sin comisiones registradas.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div> <!-- Ultimas comisiones -->
+  </div>
+
+  <!-- Actividad Ultimos 7 dias y Ultimos Eventos-->  
+  <div class="row g-4 mt-1">
+    <div class="col-lg-8">
       <div class="card shadow-sm border-0">
         <div class="card-header bg-white fw-semibold">Actividad últimos 7 días</div>
         <div class="card-body">
           <div class="row g-2 mb-3">
             {% for row in eventos_7d %}
               <div class="col-md-6">
-                <div class="border rounded p-2 d-flex justify-content-between">
-                  <span class="small">{{ row.tipo }}</span>
+                <div class="border rounded p-2 d-flex justify-content-between small">
+                  <span>{{ row.tipo }}</span>
                   <span class="fw-semibold">{{ row.total }}</span>
                 </div>
               </div>

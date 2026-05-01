@@ -1,0 +1,13 @@
+.kpi-card .card-body {
+  padding: 1rem;
+}
+
+.kpi-label {
+  color: #6c757d;
+  font-size: 0.82rem;
+}
+
+.kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+}

@@ -1,0 +1,62 @@
+{% extends "ui/base.html" %}
+{% load humanize %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">Detalle de cobranza por agente</h4>
+      <div class="text-muted small">
+        {{ agente.get_full_name|default:agente.username }} · {{ fecha_desde|date:"d/m/Y" }} a {{ fecha_hasta|date:"d/m/Y" }}
+      </div>
+    </div>
+    <a href="{% url 'ui:reporte_cobranza_agente' %}?fecha_desde={{ fecha_desde|date:'Y-m-d' }}&fecha_hasta={{ fecha_hasta|date:'Y-m-d' }}"
+       class="btn btn-outline-secondary">
+      Regresar
+    </a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      {% if pagos %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle table-erp">
+            <thead>
+              <tr>
+                <th>Póliza</th>
+                <th>Cliente</th>
+                <th>Estatus</th>
+                <th>Programada</th>
+                <th>Vencimiento</th>
+                <th>Pago</th>
+                <th>Monto</th>
+                <th>Pagado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in pagos %}
+                <tr>
+                  <td>{{ p.poliza.numero_poliza }}</td>
+                  <td>{{ p.poliza.cliente.nombre_mostrar }}</td>
+                  <td>{{ p.get_estatus_display }}</td>
+                  <td>{{ p.fecha_programada|date:"d/m/Y"|default:"-" }}</td>
+                  <td>{{ p.fecha_vencimiento|date:"d/m/Y"|default:"-" }}</td>
+                  <td>{{ p.fecha_pago|date:"d/m/Y"|default:"-" }}</td>
+                  <td>$ {{ p.monto|floatformat:2|intcomma }}</td>
+                  <td>{% if p.monto_pagado %}$ {{ p.monto_pagado|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                  <td>
+                    <a href="{% url 'ui:poliza_detail' p.poliza.pk %}" class="btn btn-sm btn-outline-primary">Ver póliza</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-muted">No hay movimientos para este agente en el periodo seleccionado.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

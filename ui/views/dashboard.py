@@ -12,7 +12,7 @@ from crm.models import Cliente
 from cotizador.models import Cotizacion
 from finanzas.models import Pago, Comision
 from polizas.models import Poliza, PolizaEvento
-
+from ui.services.dashboard import agente_kpis
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -41,104 +41,6 @@ def month_range(today: date | None = None):
     else:
         end = start.replace(month=start.month + 1)
     return start, end
-
-
-def agente_kpis(user):
-    """
-    KPIs para agente (owner/agente).
-    Basado en:
-      - Cotizacion.owner
-      - Poliza.agente
-      - Pago.poliza
-      - Comision.agente
-    """
-    today = timezone.localdate()
-    start_m, end_m = month_range(today)
-
-    # Cotizaciones del agente (mes)
-    cot_mes = Cotizacion.objects.filter(owner=user, created_at__date__gte=start_m, created_at__date__lt=end_m)
-
-    # Pendientes: BORRADOR + ENVIADA (en general)
-    cot_pendientes = Cotizacion.objects.filter(
-        owner=user,
-        estatus__in=[Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA],
-    )
-
-    # Pólizas del agente
-    polizas = Poliza.objects.filter(agente=user)
-    pol_vigentes = polizas.filter(
-        estatus=Poliza.Estatus.VIGENTE,
-        vigencia_desde__lte=today,
-        vigencia_hasta__gte=today,
-    )
-
-    in_30 = today + timedelta(days=30)
-    pol_por_vencer = polizas.filter(
-        estatus=Poliza.Estatus.VIGENTE,
-        vigencia_hasta__gte=today,
-        vigencia_hasta__lte=in_30,
-    ).order_by("vigencia_hasta")
-
-    # Pólizas emitidas este mes (para conversión)
-    pol_mes = polizas.filter(created_at__date__gte=start_m, created_at__date__lt=end_m)
-
-    # Conversión (aprox práctica):
-    # pólizas del mes / cotizaciones del mes
-    cot_mes_count = cot_mes.count()
-    pol_mes_count = pol_mes.count()
-    conversion_pct = (pol_mes_count / cot_mes_count * 100) if cot_mes_count else 0
-
-    # Pagos vencidos de pólizas del agente
-    pagos_vencidos = Pago.objects.filter(
-        poliza__agente=user,
-        estatus=Pago.Estatus.VENCIDO,
-    )
-
-    # Comisiones pendientes (monto)
-    com_pendientes = Comision.objects.filter(
-        agente=user,
-        estatus=Comision.Estatus.PENDIENTE,
-    )
-
-    # Top: últimas cotizaciones (para “trabajo del día”)
-    ult_cot = (
-        Cotizacion.objects
-        .filter(owner=user)
-        .select_related("cliente", "vehiculo", "flotilla")
-        .order_by("-created_at")[:8]
-    )
-
-    # Pendientes por estatus (mini breakdown)
-    breakdown = (
-        Cotizacion.objects
-        .filter(owner=user)
-        .values("estatus")
-        .annotate(total=Count("id"))
-        .order_by()
-    )
-    breakdown_map = {row["estatus"]: row["total"] for row in breakdown}
-
-    return {
-        "period": {"start": start_m, "end": end_m},
-        "counts": {
-            "cot_mes": cot_mes_count,
-            "cot_pendientes": cot_pendientes.count(),
-            "pol_vigentes": pol_vigentes.count(),
-            "pol_por_vencer": pol_por_vencer.count(),
-            "pagos_vencidos": pagos_vencidos.count(),
-        },
-        "money": {
-            "com_pendiente_total": com_pendientes.aggregate(s=Sum("monto"))["s"] or 0,
-        },
-        "rates": {
-            "conversion_pct": round(conversion_pct, 2),
-        },
-        "lists": {
-            "ult_cot": ult_cot,
-            "pol_por_vencer": pol_por_vencer.select_related("cliente", "aseguradora")[:8],
-        },
-        "breakdown": breakdown_map,
-    }
 
 
 # ---------------------------------------------------------------------
@@ -322,14 +224,39 @@ class SupervisorDashboardView(LoginRequiredMixin, SupervisorRequiredMixin, Templ
             "nuevos_30d": Cliente.objects.filter(created_at__date__gte=last_30).count()
             if hasattr(Cliente, "created_at") else None,
         }
-
+        # Comisiones
         ctx["comisiones_kpi"] = {
-            "pendientes": comisiones.filter(estatus=Comision.Estatus.PENDIENTE).count(),
-            "pagadas": comisiones.filter(estatus=Comision.Estatus.PAGADA).count(),
+            "pendientes": comisiones.filter(
+                estatus=Comision.Estatus.PENDIENTE
+            ).count(),
+
+            "pagadas": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA
+            ).count(),
+
             "monto_pendiente": comisiones.filter(
                 estatus=Comision.Estatus.PENDIENTE
-            ).aggregate(s=Sum("monto"))["s"] or 0,
+            ).aggregate(s=Sum("monto_comision"))["s"] or 0,
+
+            "monto_pagado_30d": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA,
+                fecha_pago__gte=last_30,
+            ).aggregate(s=Sum("monto_comision"))["s"] or 0,
+
+            "pagadas_30d": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA,
+                fecha_pago__gte=last_30,
+            ).count(),
+
+            "total_generado": comisiones.aggregate(
+                s=Sum("monto_comision")
+            )["s"] or 0,
         }
+        ctx["ultimas_comisiones"] = (
+            Comision.objects
+            .select_related("poliza", "poliza__cliente", "agente")
+            .order_by("-fecha_generacion", "-id")[:10]
+        )
 
         # Eventos recientes
         ctx["eventos"] = (
@@ -421,6 +348,9 @@ class AdminDashboardView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
 
         ctx["kpi_global"] = {
             "clientes_total": Cliente.objects.count(),
+            "nuevos_clientes_30d": Cliente.objects.filter(created_at__date__gte=last_30).count()
+            if hasattr(Cliente, "created_at") else None,
+
             "polizas_total": polizas.count(),
             "polizas_vigentes": polizas.filter(estatus=Poliza.Estatus.VIGENTE).count(),
             "polizas_en_proceso": polizas.filter(estatus=Poliza.Estatus.EN_PROCESO).count(),
@@ -437,13 +367,40 @@ class AdminDashboardView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
             ).aggregate(s=Sum("monto"))["s"] or 0,
             "monto_pagado_30d": pagos_30d.aggregate(s=Sum("monto"))["s"] or 0,
             "pagos_pagados_30d": pagos_30d.count(),
-            "comisiones_pendientes": comisiones.filter(
+        }
+        # Comisiones
+        ctx["comisiones_kpi"] = {
+            "pendientes": comisiones.filter(
                 estatus=Comision.Estatus.PENDIENTE
             ).count(),
-            "monto_comisiones_pendientes": comisiones.filter(
+
+            "pagadas": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA
+            ).count(),
+
+            "monto_pendiente": comisiones.filter(
                 estatus=Comision.Estatus.PENDIENTE
-            ).aggregate(s=Sum("monto"))["s"] or 0,
+            ).aggregate(s=Sum("monto_comision"))["s"] or 0,
+
+            "monto_pagado_30d": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA,
+                fecha_pago__gte=last_30,
+            ).aggregate(s=Sum("monto_comision"))["s"] or 0,
+
+            "pagadas_30d": comisiones.filter(
+                estatus=Comision.Estatus.PAGADA,
+                fecha_pago__gte=last_30,
+            ).count(),
+
+            "total_generado": comisiones.aggregate(
+                s=Sum("monto_comision")
+            )["s"] or 0,
         }
+        ctx["ultimas_comisiones"] = (
+            Comision.objects
+            .select_related("poliza", "poliza__cliente", "agente")
+            .order_by("-fecha_generacion", "-id")[:10]
+        )
 
         # Pólizas próximas a vencer
         ctx["proximas_polizas"] = (

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+{% load humanize %}
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 9px;
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    table-layout: fixed;
+  }
+
+  th, td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    vertical-align: middle;
+  }
+
+  th {
+    background-color: #eee;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .right {
+    text-align: right;
+  }
+
+  .center {
+    text-align: center;
+  }
+
+  .summary td {
+    font-weight: bold;
+    background-color: #f8f8f8;
+  }
+</style>
+</head>
+<body>
+
+<h2>Reporte de Pagos por Vencer</h2>
+<!-- Impresion de Filtros -->
+<table class="filters">
+  <tr>
+    <td>
+      {% if q %}Buscar: {{ q }} | {% endif %}
+      {% if agente_id %}Agente ID: {{ agente_id }} | {% endif %}
+      {% if aseguradora_id %}Aseguradora ID: {{ aseguradora_id }} | {% endif %}
+      {% if estatus %}Estatus: {{ estatus }} | {% endif %}
+      {% if desde %}Desde: {{ desde }} | {% endif %}
+      {% if hasta %}Hasta: {{ hasta }}{% endif %}
+      {% if not q and not agente_id and not aseguradora_id and not estatus and not desde and not hasta %}
+        Sin filtros
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr class="summary">
+    <td>Total registros</td>
+    <td>{{ total_registros|default:pagos|length }}</td>
+    <td>Monto total</td>
+    <td>{{ monto_total|default:"0.00" }}</td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th width="12%">Vencimiento</th>
+      <th width="14%">Póliza</th>
+      <th width="24%">Cliente</th>
+      <th width="16%">Aseguradora</th>
+      <th width="16%">Agente</th>
+      <th width="8%">Estatus</th>
+      <th width="10%" class="right">Monto</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for p in pagos %}
+    <tr>
+      <td class="center">
+        {% if p.fecha_vencimiento %}
+          {{ p.fecha_vencimiento|date:"d/m/Y" }}
+        {% elif p.fecha_programada %}
+          {{ p.fecha_programada|date:"d/m/Y" }}
+        {% else %}
+          —
+        {% endif %}
+      </td>
+
+      <td>
+        {{ p.poliza.numero_poliza|default:p.poliza.id }}
+      </td>
+
+      <td>
+        {{ p.poliza.cliente|default:"" }}
+      </td>
+
+      <td>
+        {{ p.poliza.aseguradora|default:"" }}
+      </td>
+
+      <td>
+        {{ p.poliza.agente|default:"" }}
+      </td>
+
+      <td class="center">
+        {{ p.get_estatus_display }}
+      </td>
+
+      <td class="right">
+        {{ p.monto|intcomma:2 }}
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="7" class="center">
+        No hay pagos por vencer.
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

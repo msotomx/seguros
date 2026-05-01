@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+{% load humanize %}
+<head>
+<meta charset="utf-8">
+<style>
+  body { font-family: Helvetica, Arial, sans-serif; font-size: 9px; }
+  h2 { text-align: center; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 4px; }
+  th { background-color: #eee; }
+  .right { text-align: right; }
+  .summary td { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h2>Reporte de Comisiones</h2>
+<table class="filters">
+  <tr>
+    <td>
+      {% if q %}Buscar: {{ q }} | {% endif %}
+      {% if agente_id %}Agente ID: {{ agente_id }} | {% endif %}
+      {% if aseguradora_id %}Aseguradora ID: {{ aseguradora_id }} | {% endif %}
+      {% if estatus %}Estatus: {{ estatus }} | {% endif %}
+      {% if desde %}Desde: {{ desde }} | {% endif %}
+      {% if hasta %}Hasta: {{ hasta }}{% endif %}
+      {% if not q and not agente_id and not aseguradora_id and not estatus and not desde and not hasta %}
+        Sin filtros
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr class="summary">
+    <td>Total registros</td>
+    <td>{{ total_registros }}</td>
+    <td>Total pendiente</td>
+    <td>{{ total_pendiente }}</td>
+    <td>Total pagado</td>
+    <td>{{ total_pagado|intcomma:2 }}</td>
+  </tr>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th width="14%">Póliza</th>
+      <th width="17%">Cliente</th>
+      <th width="12%">Agente</th>
+      <th width="5%">%</th>
+      <th width="10%">Base</th>
+      <th width="10%">Comisión</th>
+      <th width="10%">Estatus</th>
+      <th width="11%">Generación</th>
+      <th width="11%">Pago</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in comisiones %}
+    <tr>
+      <td width="14%">{{ c.poliza.numero_poliza|default:c.poliza.id }}</td>
+      <td width="17%">{{ c.poliza.cliente|default:"" }}</td>
+      <td width="12%">{{ c.agente|default:"" }}</td>
+      <td class="right" width="5%">{{ c.porcentaje }}%</td>
+      <td class="right" width="10%">{{ c.base_calculo }}</td>
+      <td class="right" width="10%">{{ c.monto_comision }}</td>
+      <td width="10%">{{ c.get_estatus_display }}</td>
+      <td width="11%">{{ c.fecha_generacion|date:"d/m/Y" }}</td>
+      <td width="11%">{% if c.fecha_pago %}{{ c.fecha_pago|date:"d/m/Y" }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+</body>
+</html>

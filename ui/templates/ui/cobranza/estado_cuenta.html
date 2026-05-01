@@ -1,0 +1,224 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <h3 class="mb-1">Estado de Cuenta</h3>
+      <p class="text-muted mb-0">
+        Consulta pagos programados, vencidos, pagados y saldo por cliente o póliza.
+      </p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="?{{ request.GET.urlencode }}&export=pdf" class="btn btn-outline-danger">
+        <i class="bi bi-file-earmark-pdf me-1"></i> PDF
+      </a>
+    </div>
+
+  </div>
+
+  <!-- KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total programado</div>
+          <div class="fs-4 fw-bold">${{ total_programado }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total pagado</div>
+          <div class="fs-4 fw-bold text-success">${{ total_pagado }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Total vencido</div>
+          <div class="fs-4 fw-bold text-danger">${{ total_vencido }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body">
+          <div class="text-muted small">Saldo</div>
+          <div class="fs-4 fw-bold text-primary">${{ saldo }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get">
+        <div class="row g-3">
+
+          <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text"
+                   name="q"
+                   value="{{ q }}"
+                   class="form-control"
+                   placeholder="Cliente, póliza, aseguradora o referencia">
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Cliente</label>
+            <select name="cliente" class="form-select">
+              <option value="">Todos</option>
+              {% for c in clientes %}
+                <option value="{{ c.id }}" {% if cliente_id == c.id|stringformat:"s" %}selected{% endif %}>
+                  {{ c }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Póliza</label>
+            <select name="poliza" class="form-select">
+              <option value="">Todas</option>
+              {% for p in polizas_select %}
+                <option value="{{ p.id }}" {% if poliza_id == p.id|stringformat:"s" %}selected{% endif %}>
+                  {{ p.numero_poliza|default:p.id }} — {{ p.cliente }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary">
+              Filtrar
+            </button>
+            <a href="{% url 'ui:estado_cuenta' %}" class="btn btn-outline-secondary">
+              Limpiar
+            </a>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong>Detalle del estado de cuenta</strong>
+      <span class="text-muted small">{{ total_registros }} registro(s)</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if pagos %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Vencimiento</th>
+                <th>Póliza</th>
+                <th>Cliente</th>
+                <th>Aseguradora</th>
+                <th>Agente</th>
+                <th class="text-end">Monto</th>
+                <th>Estatus</th>
+                <th>Fecha pago</th>
+                <th>Referencia</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for p in pagos %}
+              <tr>
+                <td>
+                  {% if p.fecha_vencimiento %}
+                    {{ p.fecha_vencimiento|date:"d/m/Y" }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  <a href="{% url 'ui:poliza_detail' p.poliza.pk %}" class="fw-semibold text-decoration-none">
+                    {{ p.poliza.numero_poliza|default:p.poliza.id }}
+                  </a>
+                </td>
+
+                <td>{{ p.poliza.cliente|default:"—" }}</td>
+
+                <td>{{ p.poliza.aseguradora|default:"—" }}</td>
+
+                <td>{{ p.poliza.agente|default:"Sin agente" }}</td>
+
+                <td class="text-end fw-semibold">${{ p.monto }}</td>
+
+                <td>
+                  {% if p.estatus == "PENDIENTE" %}
+                    <span class="badge text-bg-warning">Pendiente</span>
+                  {% elif p.estatus == "VENCIDO" %}
+                    <span class="badge text-bg-danger">Vencido</span>
+                  {% elif p.estatus == "PAGADO" %}
+                    <span class="badge text-bg-success">Pagado</span>
+                  {% elif p.estatus == "PARCIAL" %}
+                    <span class="badge text-bg-info">Parcial</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">{{ p.get_estatus_display }}</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if p.fecha_pago %}
+                    {{ p.fecha_pago|date:"d/m/Y" }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if p.referencia %}
+                    {{ p.referencia }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-end">
+                  <a href="{% url 'ui:poliza_detail' p.poliza.pk %}" class="btn btn-sm btn-outline-primary">
+                    Ver póliza
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+
+            <tfoot class="table-light">
+              <tr>
+                <th colspan="5">Totales</th>
+                <th class="text-end">${{ total_programado }}</th>
+                <th colspan="4"></th>
+              </tr>
+            </tfoot>
+
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-receipt fs-3"></i>
+          <div class="fw-semibold mt-2">Sin movimientos para mostrar</div>
+          <div class="small">Selecciona un cliente, póliza o ajusta los filtros.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
