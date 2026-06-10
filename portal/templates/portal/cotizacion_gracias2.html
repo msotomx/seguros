@@ -1,0 +1,52 @@
+{% extends "portal/base.html" %}
+
+{% block content %}
+<div class="container py-5">
+
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+
+      <div class="card shadow border-0">
+
+        <div class="card-body text-center py-5">
+
+          <div class="mb-4">
+            <div class="display-1 text-success">
+              ✓
+            </div>
+          </div>
+
+          <h2 class="fw-bold mb-3">
+            ¡Gracias por tu solicitud!
+          </h2>
+
+          <p class="lead text-muted mb-4">
+            En breve generamos tu póliza.
+          </p>
+
+          <p class="text-muted mb-4">
+            Un agente te contactará por medio del teléfono que nos indicaste
+            para continuar con el proceso.
+          </p>
+
+          <div class="alert alert-light border">
+            <div class="small text-muted">Folio de cotización</div>
+            <div class="fw-bold fs-5">
+              {{ cotizacion.folio }}
+            </div>
+          </div>
+
+          <a href="{% url 'portal:cotizar' %}"
+             class="btn btn-primary mt-3">
+            Realizar otra cotización
+          </a>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}

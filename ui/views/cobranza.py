@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Q, Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from django.utils.timezone import localdate
@@ -20,11 +20,16 @@ from finanzas.services.recordatorios import registrar_recordatorio_pago
 from finanzas.services.recordatorios_whatsapp import enviar_recordatorio_whatsapp
 from ui.services.pdf import render_to_pdf
 
+from django.contrib.auth import get_user_model
+from django.utils.dateparse import parse_date
+from django.utils.timezone import localdate
 
-class CobranzaMenuView(TemplateView):
+class CobranzaMenuView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_cobranza"
     template_name = "ui/cobranza/menu.html"
 
-class CarteraVencidaListView(LoginRequiredMixin, ListView):
+class CarteraVencidaListView(LoginRequiredMixin, PermissionRequiredMixin,  ListView):
+    permission_required = "accounts.view_cobranza"
     model = Pago
     template_name = "ui/cobranza/cartera_vencida.html"
     context_object_name = "pagos"
@@ -104,7 +109,8 @@ class CarteraVencidaListView(LoginRequiredMixin, ListView):
         context["hoy"] = hoy
         return context
 
-class PagosPorVencerListView(LoginRequiredMixin, ListView):
+class PagosPorVencerListView(LoginRequiredMixin, PermissionRequiredMixin,  ListView):
+    permission_required = "accounts.view_cobranza"
     model = Pago
     template_name = "ui/cobranza/pagos_por_vencer.html"
     context_object_name = "pagos"
@@ -280,7 +286,8 @@ from django.utils.dateparse import parse_date
 
 User = get_user_model()
 
-class ReporteCobranzaAgenteView(LoginRequiredMixin, TemplateView):
+class ReporteCobranzaAgenteView(LoginRequiredMixin, PermissionRequiredMixin,  TemplateView):
+    permission_required = "accounts.view_cobranza"
     template_name = "ui/cobranza/reporte_cobranza_agente.html"
 
     def get(self, request, *args, **kwargs):
@@ -464,7 +471,8 @@ from django.views.generic import ListView
 User = get_user_model()
 
 
-class ReporteCobranzaAgenteDetalleView(LoginRequiredMixin, ListView):
+class ReporteCobranzaAgenteDetalleView(LoginRequiredMixin, PermissionRequiredMixin,  ListView):
+    permission_required = "accounts.view_cobranza"    
     model = Pago
     template_name = "ui/cobranza/reporte_cobranza_agente_detalle.html"
     context_object_name = "pagos"
@@ -537,8 +545,9 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from django.http import HttpResponse
 
+class ReporteCobranzaAgenteExcelView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_cobranza"
 
-class ReporteCobranzaAgenteExcelView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         view = ReporteCobranzaAgenteView()
         view.request = request
@@ -594,7 +603,8 @@ class ReporteCobranzaAgenteExcelView(LoginRequiredMixin, TemplateView):
         return response
 
 
-class EstadoCuentaView(LoginRequiredMixin, TemplateView):
+class EstadoCuentaView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_cobranza"
     template_name = "ui/cobranza/estado_cuenta.html"
 
     def get(self, request, *args, **kwargs):
@@ -624,12 +634,14 @@ class EstadoCuentaView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
 
+        user = self.request.user
+
         q = (self.request.GET.get("q") or "").strip()
         cliente_id = (self.request.GET.get("cliente") or "").strip()
         poliza_id = (self.request.GET.get("poliza") or "").strip()
 
-        clientes = Cliente.objects.all().order_by("nombre")[:300]
-        polizas = Poliza.objects.select_related("cliente", "aseguradora", "agente").order_by("-id")[:300]
+        clientes = Cliente.objects.all().order_by("nombre")
+        polizas = Poliza.objects.select_related("cliente", "aseguradora", "agente").order_by("-id")
 
         pagos = Pago.objects.select_related(
             "poliza",
@@ -637,6 +649,15 @@ class EstadoCuentaView(LoginRequiredMixin, TemplateView):
             "poliza__aseguradora",
             "poliza__agente",
         )
+
+        # Seguridad por rol
+        if not user.has_perm("finanzas.manage_pagos"):
+            polizas = polizas.filter(agente=user)
+            pagos = pagos.filter(poliza__agente=user)
+            clientes = clientes.filter(polizas__agente=user).distinct()
+
+        clientes = clientes[:300]
+        polizas = polizas[:300]
 
         if cliente_id:
             pagos = pagos.filter(poliza__cliente_id=cliente_id)
@@ -707,3 +728,122 @@ class EstadoCuentaView(LoginRequiredMixin, TemplateView):
 
         return ctx
    
+
+from finanzas.models import SeguimientoCobranza
+User = get_user_model()
+
+
+class SeguimientoCobranzaView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_cobranza"
+    template_name = "ui/cobranza/seguimiento.html"
+
+    def get_queryset(self):
+        qs = (
+            SeguimientoCobranza.objects
+            .select_related(
+                "pago",
+                "pago__poliza",
+                "pago__poliza__cliente",
+                "pago__poliza__agente",
+                "creado_por",
+            )
+            .order_by("-created_at", "-id")
+        )
+
+        q = (self.request.GET.get("q") or "").strip()
+        tipo = (self.request.GET.get("tipo") or "").strip()
+        agente_id = (self.request.GET.get("agente") or "").strip()
+        desde = (self.request.GET.get("desde") or "").strip()
+        hasta = (self.request.GET.get("hasta") or "").strip()
+
+        if q:
+            qs = qs.filter(
+                Q(pago__poliza__numero_poliza__icontains=q) |
+                Q(pago__poliza__cliente__nombre__icontains=q) |
+                Q(comentario__icontains=q)
+            )
+
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+
+        if agente_id:
+            qs = qs.filter(pago__poliza__agente_id=agente_id)
+
+        if desde:
+            fecha_desde = parse_date(desde)
+            if fecha_desde:
+                qs = qs.filter(created_at__date__gte=fecha_desde)
+
+        if hasta:
+            fecha_hasta = parse_date(hasta)
+            if fecha_hasta:
+                qs = qs.filter(created_at__date__lte=fecha_hasta)
+
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+
+        qs = self.get_queryset()
+
+        agente_ids = (
+            qs.exclude(pago__poliza__agente__isnull=True)
+            .values_list("pago__poliza__agente_id", flat=True)
+            .distinct()
+        )
+
+        ctx["seguimientos"] = qs
+        ctx["total_registros"] = qs.count()
+
+        ctx["agentes"] = User.objects.filter(id__in=agente_ids).order_by(
+            "first_name", "last_name", "username"
+        )
+
+        ctx["tipos"] = SeguimientoCobranza.Tipo.choices
+
+        ctx["q"] = (self.request.GET.get("q") or "").strip()
+        ctx["tipo"] = (self.request.GET.get("tipo") or "").strip()
+        ctx["agente_id"] = (self.request.GET.get("agente") or "").strip()
+        ctx["desde"] = (self.request.GET.get("desde") or "").strip()
+        ctx["hasta"] = (self.request.GET.get("hasta") or "").strip()
+        ctx["hoy"] = localdate()
+
+        return ctx
+
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.shortcuts import get_object_or_404, redirect
+from django.views import View
+
+from finanzas.models import Pago
+from integrations.whatsapp import enviar_recordatorio_pago_whatsapp, WhatsAppError
+
+
+class EnviarRecordatorioWhatsAppView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = "accounts.view_cobranza"
+
+    def post(self, request, pago_id):
+        pago = get_object_or_404(
+            Pago.objects.select_related("poliza", "poliza__cliente", "poliza__agente"),
+            pk=pago_id,
+        )
+
+        user = request.user
+
+        # Seguridad: si no administra cobranza, solo pagos de sus pólizas
+        if not user.has_perm("accounts.view_cobranza") and pago.poliza.agente_id != user.id:
+            messages.error(request, "No tienes permiso para enviar recordatorios de este pago.")
+            return redirect(request.META.get("HTTP_REFERER", "ui:cartera_vencida"))
+
+        try:
+            enviar_recordatorio_pago_whatsapp(
+                pago=pago,
+                usuario=user,
+            )
+            messages.success(request, "Recordatorio enviado por WhatsApp correctamente.")
+        except WhatsAppError as e:
+            messages.error(request, f"No se pudo enviar el WhatsApp: {e}")
+        except Exception as e:
+            messages.error(request, f"Error inesperado al enviar WhatsApp: {e}")
+
+        return redirect(request.META.get("HTTP_REFERER", "ui:cartera_vencida"))

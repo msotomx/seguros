@@ -1,5 +1,5 @@
 {% extends "ui/base.html" %}
-
+{% load humanize %}
 {% block content %}
 <div class="container-fluid py-4">
 
@@ -24,7 +24,7 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <div class="text-muted small">Total programado</div>
-          <div class="fs-4 fw-bold">${{ total_programado }}</div>
+          <div class="fs-4 fw-bold">${{ total_programado|intcomma:2 }}</div>
         </div>
       </div>
     </div>
@@ -33,7 +33,7 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <div class="text-muted small">Total pagado</div>
-          <div class="fs-4 fw-bold text-success">${{ total_pagado }}</div>
+          <div class="fs-4 fw-bold text-success">${{ total_pagado|intcomma:2 }}</div>
         </div>
       </div>
     </div>
@@ -42,7 +42,7 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <div class="text-muted small">Total vencido</div>
-          <div class="fs-4 fw-bold text-danger">${{ total_vencido }}</div>
+          <div class="fs-4 fw-bold text-danger">${{ total_vencido|intcomma:2 }}</div>
         </div>
       </div>
     </div>
@@ -51,7 +51,7 @@
       <div class="card shadow-sm border-0 h-100">
         <div class="card-body">
           <div class="text-muted small">Saldo</div>
-          <div class="fs-4 fw-bold text-primary">${{ saldo }}</div>
+          <div class="fs-4 fw-bold text-primary">${{ saldo|intcomma:2 }}</div>
         </div>
       </div>
     </div>
@@ -120,7 +120,7 @@
     <div class="card-body p-0">
       {% if pagos %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle mb-0 table-erp">
             <thead class="table-light">
               <tr>
                 <th>Vencimiento</th>
@@ -159,7 +159,7 @@
 
                 <td>{{ p.poliza.agente|default:"Sin agente" }}</td>
 
-                <td class="text-end fw-semibold">${{ p.monto }}</td>
+                <td class="text-end fw-semibold">${{ p.monto|intcomma:2 }}</td>
 
                 <td>
                   {% if p.estatus == "PENDIENTE" %}
@@ -203,7 +203,7 @@
             <tfoot class="table-light">
               <tr>
                 <th colspan="5">Totales</th>
-                <th class="text-end">${{ total_programado }}</th>
+                <th class="text-end">${{ total_programado|intcomma:2 }}</th>
                 <th colspan="4"></th>
               </tr>
             </tfoot>

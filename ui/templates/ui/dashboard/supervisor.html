@@ -27,7 +27,7 @@
   </div>
 
   <!-- KPIs -->
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-4">  <!-- Primera Fila de Cards -->
 
         <div class="col-md-3">
             <a href="{% url 'ui:poliza_list' %}?estatus=VIGENTE" class="dashboard-card-link">
@@ -86,25 +86,30 @@
     </div>
   </div>
 
-  <div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
-            <div class="card shadow-sm border-0">
+<div class="row g-3">
+
+    <!-- CARD GRANDE IZQUIERDA -->
+    <div class="col-lg-3 col-md-3"> <!-- estaba lg-3 -->
+        <a href="{% url 'ui:cotizacion_list' %}?estatus=ACEPTADA&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100 dashboard-card-lg">
                 <div class="card-body">
-                    <div class="text-muted small"><strong>Pagos Cobrados (30 días)</strong></div>
-                    <div class="fs-3 fw-bold text-success">${{ pagos_kpi.monto_pagado_30d|floatformat:2|intcomma }}</div>
-                    <div class="small text-muted">
-                        {{ pagos_kpi.pagos_pagados_30d|intcomma }} pagos
+                    <div class="text-muted small"><strong>Cotizaciones Portal</strong></div>
+                    <div class="fs-3 fw-bold text-success">{{ cotizaciones_portal_kpi.aceptadas }}</div>
+                    <div class="small text-muted mt-2">
+                    Aceptadas por clientes desde portal
                     </div>
                 </div>
-
             </div>
         </a>
     </div>
 
-    <div class="col-md-3">
-        <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
-            <div class="card shadow-sm border-0">
+  <!-- BLOQUE DERECHO -->
+  <div class="col-lg-9">
+    <!-- FILA 1 -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <a href="{% url 'ui:comision_list' %}?estatus=PENDIENTE&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 dashboard-card-sm h-100">
                 <div class="card-body">
                     <div class="text-muted small"><strong>Comisiones Pendientes</strong></div>
                     <div class="fs-3 fw-bold text-success">
@@ -113,44 +118,82 @@
                     <div class="small text-muted">
                         Comisiones: {{ comisiones_kpi.pendientes }}
                     </div>
-                </div>
 
+                </div>
             </div>
         </a>
-    </div>
+      </div>
 
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0">
-        <div class="card-body">
-          <div class="text-muted small"><strong>Comisiones Pagadas (30 días)</strong></div>
-          <div class="fs-3 fw-bold">${{ comisiones_kpi.monto_pagado_30d|intcomma }}</div>
-          <div class="small text-muted">
-             Comisiones: {{ comisiones_kpi.pagadas_30d }} 
-          </div>
-        </div>
+      <div class="col-md-4">
+        <a href="{% url 'ui:comision_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 dashboard-card-sm">
+                <div class="card-body">
+                    <div class="text-muted small"><strong>Comisiones Pagadas (30 días)</strong></div>
+                    <div class="fs-3 fw-bold">${{ comisiones_kpi.monto_pagado_30d|intcomma }}</div>
+                    <div class="small text-muted">
+                        Comisiones: {{ comisiones_kpi.pagadas_30d }} 
+                    </div>
+                </div>
+            </div>
+        </a>
+      </div>
+
+      <div class="col-md-4">
+        <a href="{% url 'ui:pago_list' %}?estatus=PAGADO&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 dashboard-card-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small"><strong>Pagos Cobrados (30 días)</strong></div>
+                    <div class="fs-3 fw-bold text-success">${{ pagos_kpi.monto_pagado_30d|floatformat:2|intcomma }}</div>
+                    <div class="small text-muted">
+                        {{ pagos_kpi.pagos_pagados_30d|intcomma }} pagos
+                    </div>
+                </div>
+            </div>
+        </a>
       </div>
     </div>
 
-    <div class="col-md-3">
-        <a href="{% url 'ui:cliente_list' %}" class="dashboard-card-link">
-            <div class="card shadow-sm border-0">
+    <!-- FILA 2 -->
+    <div class="row g-3">
+      <div class="col-md-4">
+            <a href="{% url 'ui:cotizacion_list' %}?estatus=EMITIDA&ultimos=30" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 h-100 dashboard-card-lg">
                 <div class="card-body">
-                <div class="text-muted small"><strong>Clientes Totales</strong></div>
-                <div class="fs-3 fw-bold">{{ clientes_kpi.total|intcomma }}</div>
-                {% if clientes_kpi.nuevos_30d != None %}
-                    <div class="small text-muted">
-                    Nuevos 30 días: {{ clientes_kpi.nuevos_30d|intcomma }}
+                    <div class="text-muted small"><strong>Cotizaciones Emitidas</strong></div>
+                    <div class="fs-3 fw-bold text-success">{{ cotizaciones_portal_kpi.emitidas_30d }}</div>
+                    <div class="small text-muted mt-2">
+                    Ultimos 30 días
                     </div>
-                {% endif %}
                 </div>
             </div>
         </a>
-    </div>
+      </div>
+      <!-- Clientes Totales -->
+      <div class="col-md-4">
+        <a href="{% url 'ui:cliente_list' %}" class="dashboard-card-link">
+            <div class="card shadow-sm border-0 dashboard-card-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small"><strong>Clientes Totales</strong></div>
+                    <div class="fs-3 fw-bold">{{ clientes_kpi.total|intcomma }}</div>
+                    {% if clientes_kpi.nuevos_30d != None %}
+                        <div class="small text-muted">
+                        Nuevos 30 días: {{ clientes_kpi.nuevos_30d|intcomma }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </a>
+      </div>
+    </div> <!-- Fin de Segunda fila, Cards Chicos enseguida de Cotizaciones Portal -->  
+  </div> <!-- Bloque Derecho -->
+</div> 
 
-  </div>
+<div class="row g-3 mb-4"> 
+
+</div>
 
   <!-- Alertas -->
-  <div class="row g-4 mb-4">
+  <div class="row g-4 mb-4 py-3">
 
     <div class="col-lg-6">
       <div class="card shadow-sm border-0">

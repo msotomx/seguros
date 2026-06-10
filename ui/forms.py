@@ -2,6 +2,8 @@ from django import forms
 from django.db.models import Q
 from django.views.generic import TemplateView
 from django.utils import timezone
+from datetime import datetime
+from django import forms
 
 from .forms_mixins import BootstrapFormMixin
 from autos.models import Vehiculo, VehiculoCatalogo
@@ -210,3 +212,287 @@ class CotizacionDatosForm(forms.ModelForm):
             "vigencia_hasta": today + timedelta(days=365),
             "forma_pago_preferida": "CONTADO",
         }
+
+
+# AUTOS - MARCAS, SUBMARCAS, CATALOGO DE VEHICULOS, VEHICULOS
+
+from autos.models import Marca, SubMarca, VehiculoCatalogo, Vehiculo
+
+class MarcaForm(forms.ModelForm):
+    class Meta:
+        model = Marca
+        fields = ["nombre"]
+        widgets = {
+            "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Toyota"}),
+        }
+
+
+class SubMarcaForm(forms.ModelForm):
+    class Meta:
+        model = SubMarca
+        fields = ["marca", "nombre"]
+        widgets = {
+            "marca": forms.Select(attrs={"class": "form-select"}),
+            "nombre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej. Corolla"}),
+        }
+
+
+class VehiculoCatalogoForm(forms.ModelForm):
+
+    class Meta:
+        model = VehiculoCatalogo
+        fields = [
+            "marca",
+            "submarca",
+            "anio",
+            "version",
+            "clave_amis",
+            "tipo_vehiculo",
+            "valor_referencia",
+        ]
+
+        widgets = {
+            "marca": forms.Select(attrs={"class": "form-select"}),
+            "submarca": forms.Select(attrs={"class": "form-select"}),
+            "anio": forms.Select(attrs={"class": "form-select"}),
+            "version": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "Ej. GLI 2.0 Turbo DSG, LE CVT, XLE, LT..."
+                }
+            ),
+            "clave_amis": forms.TextInput(attrs={"class": "form-control"}),
+            "tipo_vehiculo": forms.TextInput(attrs={"class": "form-control"}),
+            "valor_referencia": forms.NumberInput(
+                attrs={"class": "form-control", "step": "0.01"}
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Lista de años
+        current_year = datetime.now().year
+
+        YEARS = [
+            (y, y)
+            for y in range(current_year + 1, 1950 - 1, -1)
+        ]
+
+        self.fields["anio"].widget.choices = YEARS
+
+        # Submarcas dependientes
+        self.fields["submarca"].queryset = SubMarca.objects.none()
+
+        if self.instance and self.instance.pk:
+            self.fields["submarca"].queryset = SubMarca.objects.filter(
+                marca=self.instance.marca
+            ).order_by("nombre")
+
+        marca_id = self.data.get("marca")
+
+        if marca_id:
+            self.fields["submarca"].queryset = SubMarca.objects.filter(
+                marca_id=marca_id
+            ).order_by("nombre")            
+    
+
+class VehiculoForm(forms.ModelForm):
+    marca = forms.ModelChoiceField(
+        queryset=Marca.objects.filter(is_active=True).order_by("nombre"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_marca_ajax"}),
+        label="Marca"
+    )
+
+    submarca = forms.ModelChoiceField(
+        queryset=SubMarca.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select", "id": "id_submarca_ajax"}),
+        label="Submarca"
+    )
+
+    class Meta:
+        model = Vehiculo
+        fields = [
+            "cliente",
+            "catalogo",
+            "tipo_uso",
+            "marca_texto",
+            "submarca_texto",
+            "modelo_anio",
+            "version",
+            "vin",
+            "serie_motor",
+            "placas",
+            "color",
+            "tipo_vehiculo",
+            "valor_comercial",
+            "adaptaciones",
+        ]
+
+        widgets = {
+            "cliente": forms.Select(attrs={"class": "form-select"}),
+            "catalogo": forms.Select(attrs={"class": "form-select", "id": "id_catalogo_ajax"}),
+            "tipo_uso": forms.Select(attrs={"class": "form-select"}),
+            "marca_texto": forms.HiddenInput(attrs={"id": "id_marca_texto"}),
+            "submarca_texto": forms.HiddenInput(attrs={"id": "id_submarca_texto"}),
+            "version": forms.HiddenInput(attrs={"id": "id_version"}),
+            "tipo_vehiculo": forms.HiddenInput(attrs={"id": "id_tipo_vehiculo"}),
+            "modelo_anio": forms.Select(attrs={"class": "form-select", "id": "id_modelo_anio"}),
+            "vin": forms.TextInput(attrs={"class": "form-control"}),
+            "serie_motor": forms.TextInput(attrs={"class": "form-control"}),
+            "placas": forms.TextInput(attrs={"class": "form-control"}),
+            "color": forms.TextInput(attrs={"class": "form-control"}),
+            "valor_comercial": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "id": "id_valor_comercial"}),
+            "adaptaciones": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        current_year = datetime.now().year
+        years = [(y, y) for y in range(current_year + 1, 1950 - 1, -1)]
+        self.fields["modelo_anio"].widget.choices = years
+
+        self.fields["catalogo"].queryset = VehiculoCatalogo.objects.filter(
+            is_active=True
+        ).select_related("marca", "submarca").order_by("-anio", "marca__nombre", "submarca__nombre")
+
+        # Editar vehículo existente
+        if self.instance and self.instance.pk and self.instance.catalogo:
+            catalogo = self.instance.catalogo
+
+            self.fields["marca"].initial = catalogo.marca_id
+            self.fields["submarca"].queryset = SubMarca.objects.filter(
+                marca=catalogo.marca,
+                is_active=True
+            ).order_by("nombre")
+            self.fields["submarca"].initial = catalogo.submarca_id
+
+        # POST con marca seleccionada
+        marca_id = self.data.get("marca")
+        if marca_id:
+            self.fields["submarca"].queryset = SubMarca.objects.filter(
+                marca_id=marca_id,
+                is_active=True
+            ).order_by("nombre")
+
+
+# USUARIOS
+
+from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+
+from accounts.models import UserProfile
+
+User = get_user_model()
+
+
+class UsuarioCreateForm(forms.ModelForm):
+    rol = forms.ChoiceField(
+        choices=UserProfile.Rol.choices,
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
+
+    password1 = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(attrs={"class": "form-control"})
+    )
+
+    password2 = forms.CharField(
+        label="Confirmar contraseña",
+        widget=forms.PasswordInput(attrs={"class": "form-control"})
+    )
+
+    telefono = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email", "username"]
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "username": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("password1") != cleaned.get("password2"):
+            raise forms.ValidationError("Las contraseñas no coinciden.")
+        return cleaned
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        user.is_active = True
+
+        if commit:
+            user.save()
+
+            rol = self.cleaned_data["rol"]
+            group, _ = Group.objects.get_or_create(name=rol.title())
+            user.groups.set([group])
+
+            perfil, _ = UserProfile.objects.get_or_create(user=user)
+            perfil.rol = rol
+            perfil.telefono = self.cleaned_data.get("telefono", "")
+            perfil.save()
+
+        return user
+
+
+class UsuarioUpdateForm(forms.ModelForm):
+    rol = forms.ChoiceField(
+        choices=UserProfile.Rol.choices,
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
+
+    telefono = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+
+    
+    class Meta:
+        model = User
+        fields = ["first_name", "last_name", "email", "username", "is_active"]
+        widgets = {
+            "first_name": forms.TextInput(attrs={"class": "form-control"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "username": forms.TextInput(attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        perfil = getattr(self.instance, "perfil", None)
+
+        if perfil:
+            self.fields["rol"].initial = perfil.rol
+            self.fields["telefono"].initial = perfil.telefono
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+
+        if commit:
+            user.save()
+
+            rol = self.cleaned_data["rol"]
+            group, _ = Group.objects.get_or_create(name=rol.title())
+            user.groups.set([group])
+
+            perfil, _ = UserProfile.objects.get_or_create(user=user)
+            perfil.rol = rol
+            perfil.telefono = self.cleaned_data.get("telefono", "")
+            perfil.save()
+
+        return user
+    

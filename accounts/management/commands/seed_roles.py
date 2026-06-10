@@ -34,10 +34,31 @@ class Command(BaseCommand):
         roles: Dict[str, Dict[str, AppPolicy]] = {
             # Admin: TODO en todas las apps + todos los manage_*
             "Admin": {
-                "accounts": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
+                "accounts": AppPolicy(
+                    actions={"add", "change", "delete", "view"},
+                    include_manage=True,
+                    extra_codenames={
+                        "can_quote",
+                        "can_issue_policy",
+                        "can_cancel_policy",
+                        "can_manage_tariffs",
+                        "can_view_finance",
+                        "can_manage_finance",
+                        "view_reportes",
+                        "view_cobranza",
+                        "view_clientes",
+                        "manage_comisiones",
+                        "manage_pagos",
+                        "emitir_poliza",
+                    },
+                ),
                 "catalogos": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "crm": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
-                "autos": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
+                "autos": AppPolicy(
+                    actions={"add", "change", "delete", "view"}, 
+                    include_manage=True,
+                    extra_codenames={"manage_vehiculos"},
+                ),
                 "tarifas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "cotizador": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
@@ -46,7 +67,6 @@ class Command(BaseCommand):
                     actions={"add", "change", "delete", "view"},
                     extra_codenames={"download_documento"},
                 ),
-
             },
             # Supervisor: Es el Gerente que tiene a su cargos Agentes
             #             Opera Cuentas-usuarios, Documentos, CRM, Autos, Cotizaciones y Pólizas.
@@ -57,13 +77,38 @@ class Command(BaseCommand):
             # - Finanzas: marcar pago -pagado, marcar comision pagada
             # - Tarifas: NO
             "Supervisor": {
-                "accounts": AppPolicy(actions={"add", "change", "view"}),  # sí administra agentes
+                "accounts": AppPolicy(
+                    actions={"add", "change", "view"},
+                    extra_codenames={
+                        "can_quote",
+                        "can_issue_policy",
+                        "can_cancel_policy",
+                        "can_view_finance",
+                        "can_manage_finance",
+                        "view_reportes",
+                        "view_cobranza",
+                        "view_clientes",
+                        "manage_comisiones",
+                        "manage_pagos",
+                        "emitir_poliza",
+                    },
+                ),
                 "catalogos": AppPolicy(actions={"view"}),
-                "crm": AppPolicy(actions={"add", "change", "view"}, include_manage=False),  # sin delete
-                "autos": AppPolicy(actions={"add", "change", "view"}),
+                "crm": AppPolicy(
+                    actions={"add", "change", "view"}, 
+                    extra_codenames={
+                        "reassign_cliente_owner",
+                    },
+                    include_manage=False
+                ),
+                "autos": AppPolicy(
+                    actions={"add", "change", "view"},
+                    include_manage=True,
+                    extra_codenames={"manage_vehiculos"},
+                    ),
                 "cotizador": AppPolicy(actions={"add", "change", "delete", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
-                "finanzas": AppPolicy(actions={"add","view", "change"}, include_manage=True),
+                "finanzas": AppPolicy(actions={"add", "view", "change"}, include_manage=True),
                 "documentos": AppPolicy(
                     actions={"add", "change", "view"},
                     extra_codenames={"download_documento"},
@@ -75,19 +120,25 @@ class Command(BaseCommand):
             # - Finanzas: solo ver
             # - Tarifas: NO
             "Agente": {
-                "accounts": AppPolicy(actions={"view"}),  # ver usuarios (opcional)
+                "accounts": AppPolicy(
+                    actions={}, 
+                    extra_codenames={
+                        "can_quote",
+                        "can_issue_policy",
+                        "can_view_finance",
+                        "emitir_poliza",
+                    },
+                ),
                 "catalogos": AppPolicy(actions={"view"}),  # ver aseguradoras/productos/coberturas
                 "crm": AppPolicy(actions={"add", "change", "view"}, include_manage=False),
                 "autos": AppPolicy(actions={"add", "change", "view"}),
                 "cotizador": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
                 "polizas": AppPolicy(actions={"add", "change", "view"}, include_manage=True),
-                "finanzas": AppPolicy(actions={"view"}),  # solo consulta
+                "finanzas": AppPolicy(actions={"view"}),
                 "documentos": AppPolicy(
                     actions={"add", "view"},
                     extra_codenames={"download_documento"},
                 ),
-
-                # "tarifas": (no incluido)
             },
 
             # Operador: captura y seguimiento.
@@ -96,6 +147,12 @@ class Command(BaseCommand):
             # - Finanzas: no
             # - Tarifas: no
             "Operador": {
+                "accounts": AppPolicy(
+                    actions={},
+                    extra_codenames={
+                        "can_quote",
+                    },
+                ),
                 "documentos": AppPolicy(actions={"add", "change", "view"}),
                 "catalogos": AppPolicy(actions={"view"}),
                 "crm": AppPolicy(actions={"add", "change", "view"}),

@@ -61,6 +61,9 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
         related_name="cliente_portal",
     )
     portal_activo = models.BooleanField(default=True)
+    codigo_postal = models.CharField(max_length=5, blank=True, default="", db_index=True)
+    ciudad = models.CharField(max_length=100, blank=True, default="")
+    estado = models.CharField(max_length=100, blank=True, default="")
 
     class Meta:
         indexes = [
@@ -160,3 +163,9 @@ class Mensaje(TimeStampedModel):
     class Meta:
         indexes = [models.Index(fields=["conversacion", "fecha_hora"])]
 
+class CodigoPostal(models.Model):
+    codigo_postal = models.CharField(max_length=5, blank=True, default="", db_index=True)
+    colonia = models.CharField(max_length=60, blank=True, default="")
+    municipio = models.CharField(max_length=50, blank=True, default="")
+    ciudad = models.CharField(max_length=60, blank=True, default="")
+    estado = models.CharField(max_length=60, blank=True, default="")

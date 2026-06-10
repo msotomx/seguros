@@ -1,0 +1,146 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <h3 class="mb-1">Seguimiento de Cobranza</h3>
+      <p class="text-muted mb-0">
+        Consulta llamadas, mensajes, promesas de pago y notas de seguimiento.
+      </p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get">
+        <div class="row g-3">
+
+          <div class="col-md-3">
+            <label class="form-label">Buscar</label>
+            <input type="text" name="q" value="{{ q }}" class="form-control"
+                   placeholder="Póliza, cliente o comentario">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" class="form-select">
+              <option value="">Todos</option>
+              {% for value, label in tipos %}
+                <option value="{{ value }}" {% if tipo == value %}selected{% endif %}>
+                  {{ label }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Agente</label>
+            <select name="agente" class="form-select">
+              <option value="">Todos</option>
+              {% for a in agentes %}
+                <option value="{{ a.id }}" {% if agente_id == a.id|stringformat:"s" %}selected{% endif %}>
+                  {{ a }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" class="form-control">
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" class="form-control">
+          </div>
+
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <a href="{% url 'ui:seguimiento_cobranza' %}" class="btn btn-outline-secondary">
+              Limpiar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              Filtrar
+            </button>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong>Detalle de seguimientos</strong>
+      <span class="text-muted small">{{ total_registros }} registro(s)</span>
+    </div>
+
+    <div class="card-body p-0">
+      {% if seguimientos %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Póliza</th>
+                <th>Cliente</th>
+                <th>Agente</th>
+                <th>Comentario</th>
+                <th>Próxima acción</th>
+                <th>Registró</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for s in seguimientos %}
+              <tr>
+                <td>{{ s.created_at|date:"d/m/Y H:i" }}</td>
+
+                <td>
+                  <span class="badge text-bg-primary">
+                    {{ s.get_tipo_display }}
+                  </span>
+                </td>
+
+                <td>
+                  <a href="{% url 'ui:poliza_detail' s.pago.poliza.pk %}" class="fw-semibold text-decoration-none">
+                    {{ s.pago.poliza.numero_poliza|default:s.pago.poliza.id }}
+                  </a>
+                </td>
+
+                <td>{{ s.pago.poliza.cliente|default:"—" }}</td>
+
+                <td>{{ s.pago.poliza.agente|default:"Sin agente" }}</td>
+
+                <td>{{ s.comentario|truncatechars:120 }}</td>
+
+                <td>
+                  {% if s.proxima_accion %}
+                    {{ s.proxima_accion|date:"d/m/Y" }}
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+
+                <td>{{ s.creado_por|default:"—" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-list-check fs-3"></i>
+          <div class="fw-semibold mt-2">No hay seguimientos registrados</div>
+          <div class="small">Cuando se registren acciones de cobranza aparecerán aquí.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

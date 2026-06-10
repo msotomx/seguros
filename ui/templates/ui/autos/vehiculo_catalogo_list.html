@@ -1,0 +1,80 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">Catálogo de vehículos</h3>
+      <p class="text-muted mb-0">Versiones, años y claves AMIS.</p>
+    </div>
+
+    {% if perms.autos.manage_vehiculos %}
+    <a href="{% url 'ui:vehiculo_catalogo_create' %}" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i> Nuevo vehículo catálogo
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-2">
+        <div class="col-md-10">
+          <input type="text" name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Buscar marca, submarca, versión, AMIS o tipo">
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-outline-primary w-100">Buscar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Marca</th>
+              <th>Submarca</th>
+              <th>Año</th>
+              <th>Versión</th>
+              <th>Clave AMIS</th>
+              <th>Tipo</th>
+              <th class="text-end">Valor ref.</th>
+              <th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vehiculos_catalogo %}
+            <tr>
+              <td>{{ v.marca }}</td>
+              <td>{{ v.submarca }}</td>
+              <td>{{ v.anio }}</td>
+              <td>{{ v.version|default:"—" }}</td>
+              <td>{{ v.clave_amis|default:"—" }}</td>
+              <td>{{ v.tipo_vehiculo|default:"—" }}</td>
+              <td class="text-end">
+                {% if v.valor_referencia %}${{ v.valor_referencia }}{% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td class="text-end">
+                {% if perms.autos.manage_vehiculos %}
+                <a href="{% url 'ui:vehiculo_catalogo_update' v.pk %}" class="btn btn-sm btn-outline-primary">
+                  Editar
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">No hay vehículos en catálogo.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "portal/base.html" %}
+{% block title %}Solicitud recibida{% endblock %}
+
+{% block content %}
+
+<style>
+  .thanks-wrap {
+    background: #f5f8fb;
+    min-height: calc(100vh - 80px);
+  }
+
+  .thanks-card {
+    border: 0;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(13, 59, 102, .12);
+  }
+
+  .thanks-hero {
+    background: linear-gradient(135deg, #0D3B66 0%, #145DA0 100%);
+    color: #fff;
+    padding: 44px 36px;
+    text-align: center;
+  }
+
+  .check-circle {
+    width: 82px;
+    height: 82px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.16);
+    border: 1px solid rgba(255,255,255,.24);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 22px;
+    font-size: 3rem;
+    font-weight: 700;
+  }
+
+  .folio-box {
+    background: #f8fafc;
+    border: 1px solid #e5edf5;
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .next-step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid #eef2f6;
+  }
+
+  .next-step:last-child {
+    border-bottom: 0;
+  }
+
+  .step-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: #eef4f8;
+    color: #0D3B66;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+</style>
+
+<div class="thanks-wrap py-5">
+  <div class="container">
+
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-xl-7">
+
+        <div class="card thanks-card">
+
+          <div class="thanks-hero">
+            <div class="check-circle">
+              ✓
+            </div>
+
+            <h1 class="fw-bold mb-3">
+              ¡Gracias por tu solicitud!
+            </h1>
+
+            <p class="lead mb-0" style="opacity:.9;">
+              Recibimos tu selección correctamente. Un agente revisará la información
+              para continuar con el proceso de emisión.
+            </p>
+          </div>
+
+          <div class="card-body p-4 p-lg-5">
+
+            <div class="folio-box text-center mb-4">
+              <div class="text-muted small mb-1">
+                Folio de cotización
+              </div>
+              <div class="fs-3 fw-bold" style="color:#0D3B66;">
+                {{ cotizacion.folio }}
+              </div>
+            </div>
+
+            <h5 class="fw-bold mb-3">
+              ¿Qué sigue?
+            </h5>
+
+            <div class="next-step">
+              <div class="step-icon">
+                <i class="bi bi-person-check"></i>
+              </div>
+              <div>
+                <div class="fw-semibold">
+                  Un agente validará tu solicitud
+                </div>
+                <div class="text-muted small">
+                  Revisaremos tus datos y la opción seleccionada para confirmar la información necesaria.
+                </div>
+              </div>
+            </div>
+
+            <div class="next-step">
+              <div class="step-icon">
+                <i class="bi bi-telephone"></i>
+              </div>
+              <div>
+                <div class="fw-semibold">
+                  Te contactaremos por teléfono
+                </div>
+                <div class="text-muted small">
+                  Un agente se comunicará al número que nos indicaste para continuar con la emisión de tu póliza.
+                </div>
+              </div>
+            </div>
+
+            <div class="next-step">
+              <div class="step-icon">
+                <i class="bi bi-shield-check"></i>
+              </div>
+              <div>
+                <div class="fw-semibold">
+                  Continuaremos con la emisión
+                </div>
+                <div class="text-muted small">
+                  Una vez confirmada la información, se generará tu póliza y recibirás las instrucciones para consultar y pagar.
+                </div>
+              </div>
+            </div>
+
+            <div class="alert alert-light border mt-4 mb-4">
+              <div class="fw-semibold mb-1">
+                Importante
+              </div>
+              <div class="text-muted small">
+                La selección realizada está sujeta a validación final de datos, condiciones del vehículo y políticas de la aseguradora.
+              </div>
+            </div>
+
+            <div class="d-flex flex-column flex-md-row gap-2 justify-content-center">
+              <a href="{% url 'portal:cotizar' %}" class="btn btn-primary btn-lg">
+                Realizar otra cotización
+              </a>
+
+              <a href="{% url 'portal:cotizacion_opciones' pk=cotizacion.pk %}" class="btn btn-outline-secondary btn-lg">
+                Ver opción seleccionada
+              </a>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

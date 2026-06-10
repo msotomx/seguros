@@ -42,6 +42,21 @@ class VehiculoCatalogo(TimeStampedModel, SoftDeleteModel):
             models.Index(fields=["clave_amis"]),
         ]
 
+    def __str__(self):
+        partes = [
+            self.marca.nombre if self.marca else "",
+            self.submarca.nombre if self.submarca else "",
+            str(self.anio),
+            self.version,
+        ]
+
+        texto = " ".join([p for p in partes if p])
+
+        if self.clave_amis:
+            texto += f" | AMIS: {self.clave_amis}"
+
+        return texto
+
 
 class Vehiculo(TimeStampedModel, SoftDeleteModel):
     class TipoUso(models.TextChoices):
@@ -59,8 +74,7 @@ class Vehiculo(TimeStampedModel, SoftDeleteModel):
     submarca_texto = models.CharField(max_length=120, blank=True, default="")
     modelo_anio = models.PositiveIntegerField(validators=[MinValueValidator(1950), MaxValueValidator(2100)], db_index=True)
     version = models.CharField(max_length=120, blank=True, default="")
-
-    vin = models.CharField(max_length=40, blank=True, default="", db_index=True)
+    vin = models.CharField(max_length=17, blank=True, default="", db_index=True)
     serie_motor = models.CharField(max_length=40, blank=True, default="")
     placas = models.CharField(max_length=20, blank=True, default="", db_index=True)
     color = models.CharField(max_length=40, blank=True, default="")
@@ -76,6 +90,20 @@ class Vehiculo(TimeStampedModel, SoftDeleteModel):
         permissions = [
             ("manage_vehiculos", "Puede administrar vehículos"),
         ]
+
+
+    def save(self, *args, **kwargs):
+
+        if self.vin:
+            self.vin = self.vin.upper().strip()
+
+        if self.serie_motor:
+            self.serie_motor = self.serie_motor.upper().strip()
+
+        if self.placas:
+            self.placas = self.placas.upper().strip()
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.marca_texto or (self.catalogo.marca.nombre if self.catalogo else '')} {self.submarca_texto or (self.catalogo.submarca.nombre if self.catalogo else '')} {self.modelo_anio}"

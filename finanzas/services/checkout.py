@@ -27,21 +27,29 @@ def _concepto_pago(pago: Pago) -> str:
 
 
 def _build_return_urls(request) -> dict:
+    base = settings.PUBLIC_BASE_URL
+
     return {
-        "success": request.build_absolute_uri(
-            reverse("portal:pago_return", kwargs={"status": "success"})
-        ),
-        "pending": request.build_absolute_uri(
-            reverse("portal:pago_return", kwargs={"status": "pending"})
-        ),
-        "failure": request.build_absolute_uri(
-            reverse("portal:pago_return", kwargs={"status": "failure"})
-        ),
+        "success": f"{base}{reverse('portal:pago_return', kwargs={'status':'success'})}",
+        "pending": f"{base}{reverse('portal:pago_return', kwargs={'status':'pending'})}",
+        "failure": f"{base}{reverse('portal:pago_return', kwargs={'status':'failure'})}",
     }
 
+from urllib.parse import urljoin
+from django.conf import settings
+from django.urls import reverse
 
-def _build_notification_url(request) -> str:
-    return request.build_absolute_uri(reverse("integrations:mercadopago_webhook"))
+
+def _build_absolute_public_url(path):
+    base = settings.PUBLIC_BASE_URL.rstrip("/") + "/"
+    path = path.lstrip("/")
+    return urljoin(base, path)
+
+
+def _build_notification_url(request):
+    return _build_absolute_public_url(
+        reverse("integrations:mercadopago_webhook")
+    )
 
 
 def _crear_preferencia_mercadopago(*, pago: Pago, back_urls: dict, notification_url: str) -> dict:
@@ -87,7 +95,9 @@ def _crear_preferencia_mercadopago(*, pago: Pago, back_urls: dict, notification_
     data = response.get("response", {}) if isinstance(response, dict) else {}
 
     if not data or "id" not in data:
-        raise ValidationError("No fue posible crear la preferencia en MercadoPago.")
+        raise ValidationError(
+            f"No fue posible crear la preferencia en MercadoPago. Respuesta: {response}"
+        )
 
     return {
         "provider": Pago.Provider.MERCADOPAGO,
@@ -121,8 +131,10 @@ def crear_checkout_pago(pago: Pago, request=None, actor=None) -> dict:
         raise ValidationError("Se requiere request para construir URLs de retorno y webhook.")
 
     back_urls = _build_return_urls(request)
+    print("[crear_checkout_pago] BACK_URLS:", back_urls)
     notification_url = _build_notification_url(request)
-
+    print("SUCCESS URL:", back_urls.get("success"))
+    print("[crear_checkout_pago] NOTIFICATION_URL:", notification_url)
     provider_result = _crear_preferencia_mercadopago(
         pago=pago,
         back_urls=back_urls,

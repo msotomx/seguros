@@ -54,14 +54,24 @@ class ClienteListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = "crm.view_cliente"
     paginate_by = 20
 
+
     def get_queryset(self):
         qs = super().get_queryset().filter(is_active=True).select_related("owner")
         q = self.request.GET.get("q", "").strip()
         if q:
             qs = qs.filter(
-                # búsqueda simple; luego refinamos
+                # búsqueda simple
                 nombre__icontains=q
             ) | qs.filter(apellido_paterno__icontains=q) | qs.filter(rfc__icontains=q) | qs.filter(email_principal__icontains=q)
+
+        user = self.request.user
+
+        if user.has_perm("accounts.view_reportes") or user.is_superuser:
+            print("[clienteList]: en if user.has_perm(view_reportes)")
+            return qs.order_by("-id")
+
+        qs =  qs.filter(owner=user)
+
         return qs.order_by("-id")
 
 

@@ -41,13 +41,21 @@ from .views import (
     EndosoCreateView, EndosoUpdateView, EndosoDeleteView,
     ReporteMenuView, ReporteComisionesView, ReporteCarteraVencidaView,
     ReporteRenovacionesView, ReporteProduccionAgenteView, ReporteConversionAgenteView,
-    EstadoCuentaView
+    EstadoCuentaView, SeguimientoCobranzaView,
+    MarcaListView, MarcaCreateView, MarcaUpdateView,
+    SubMarcaListView, SubMarcaCreateView, SubMarcaUpdateView,
+    VehiculoCatalogoListView, VehiculoCatalogoCreateView, VehiculoCatalogoUpdateView,
+    VehiculoListView, VehiculoCreateView, VehiculoUpdateView,
+    ajax_submarcas_por_marca, ajax_catalogos_por_submarca,
+    EnviarRecordatorioWhatsAppView,
+    UsuarioListView, UsuarioCreateView, UsuarioUpdateView, UsuarioToggleActivoView,
+    CambiarPasswordView, CambiarPasswordDoneView,
 )
 
 app_name = "ui"
 
 urlpatterns = [
-    # ✅ Dashboard principal
+    # Dashboard principal
     path("", DashboardView.as_view(), name="dashboard"),
     path("dashboard/basic/", BasicDashboardView.as_view(), name="dashboard_basic"),
     # Dashboard por rol
@@ -107,6 +115,7 @@ urlpatterns = [
     path("cobranza/reporte-agentes/excel/", ReporteCobranzaAgenteExcelView.as_view(),
         name="reporte_cobranza_agente_excel"),
     path("cobranza/estado-cuenta/",EstadoCuentaView.as_view(),name="estado_cuenta"),
+    path("cobranza/seguimiento/", SeguimientoCobranzaView.as_view(), name="seguimiento_cobranza"),
     # Recordatorios
     path("cobranza/pagos/<int:pk>/recordatorio/", pago_enviar_recordatorio, name="pago_enviar_recordatorio"),
     path("cobranza/pagos/<int:pk>/recordatorio-whatsapp/",
@@ -126,5 +135,34 @@ urlpatterns = [
     path("reportes/cartera-vencida/", ReporteCarteraVencidaView.as_view(), name="reporte_cartera_vencida"),
     path("reportes/comisiones/", ReporteComisionesView.as_view(), name="reporte_comisiones"),
     path("reportes/renovaciones/", ReporteRenovacionesView.as_view(), name="reporte_renovaciones"),
-]        
+    # Marcas
+    path("autos/marcas/", MarcaListView.as_view(), name="marca_list"),
+    path("autos/marcas/nueva/", MarcaCreateView.as_view(), name="marca_create"),
+    path("autos/marcas/<int:pk>/editar/", MarcaUpdateView.as_view(), name="marca_update"),
+    # Submarcas
+    path("autos/submarcas/", SubMarcaListView.as_view(), name="submarca_list"),
+    path("autos/submarcas/nueva/", SubMarcaCreateView.as_view(), name="submarca_create"),
+    path("autos/submarcas/<int:pk>/editar/", SubMarcaUpdateView.as_view(), name="submarca_update"),
+    # Catálogo vehículos
+    path("autos/catalogo/", VehiculoCatalogoListView.as_view(), name="vehiculo_catalogo_list"),
+    path("autos/catalogo/nuevo/", VehiculoCatalogoCreateView.as_view(), name="vehiculo_catalogo_create"),
+    path("autos/catalogo/<int:pk>/editar/", VehiculoCatalogoUpdateView.as_view(), name="vehiculo_catalogo_update"),
+    # Vehículos cliente
+    path("autos/vehiculos/", VehiculoListView.as_view(), name="vehiculo_list"),
+    path("autos/vehiculos/nuevo/", VehiculoCreateView.as_view(), name="vehiculo_create"),
+    path("autos/vehiculos/<int:pk>/editar/", VehiculoUpdateView.as_view(), name="vehiculo_update"),
+    # Ajax
+    path("ajax/submarcas/", ajax_submarcas_por_marca, name="ajax_submarcas_por_marca"),
+    path("ajax/catalogos-vehiculo/", ajax_catalogos_por_submarca, name="ajax_catalogos_por_submarca"),
+    # Envio de Recordatorios por WA
+    path("cobranza/pagos/<int:pago_id>/whatsapp/", EnviarRecordatorioWhatsAppView.as_view(),
+        name="enviar_recordatorio_whatsapp"),
+    # Usuarios
+    path("usuarios/", UsuarioListView.as_view(), name="usuario_list"),
+    path("usuarios/nuevo/", UsuarioCreateView.as_view(), name="usuario_create"),
+    path("usuarios/<int:pk>/editar/", UsuarioUpdateView.as_view(), name="usuario_update"),
+    path("usuarios/<int:pk>/toggle-activo/", UsuarioToggleActivoView.as_view(), name="usuario_toggle_activo"),
+    path("mi-cuenta/password/", CambiarPasswordView.as_view(), name="mi_password_change"),
+    path("mi-cuenta/password/listo/", CambiarPasswordDoneView.as_view(), name="mi_password_change_done"),
+]
 

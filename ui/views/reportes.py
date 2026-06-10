@@ -1,5 +1,7 @@
 from decimal import Decimal
 from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+
 from django.db.models import Q, Sum, Value, DecimalField, Count
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -12,14 +14,16 @@ from polizas.models import Poliza
 from cotizador.models import Cotizacion
 
 
-
 User = get_user_model()
 
-class ReporteMenuView(TemplateView):
+class ReporteMenuView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/menu.html"
 
-class ReporteComisionesView(TemplateView):
+class ReporteComisionesView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/comisiones.html"
+
 
     def get(self, request, *args, **kwargs):
         qs = self.get_queryset()
@@ -162,7 +166,8 @@ class ReporteComisionesView(TemplateView):
 
 User = get_user_model()
 
-class ReporteCarteraVencidaView(TemplateView):
+class ReporteCarteraVencidaView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/cartera_vencida.html"
 
     def get(self, request, *args, **kwargs):
@@ -313,7 +318,8 @@ class ReporteCarteraVencidaView(TemplateView):
 
 User = get_user_model()
 
-class ReporteRenovacionesView(TemplateView):
+class ReporteRenovacionesView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/renovaciones.html"
 
     def get(self, request, *args, **kwargs):
@@ -495,7 +501,8 @@ class ReporteRenovacionesView(TemplateView):
 
 User = get_user_model()
 
-class ReporteProduccionAgenteView(TemplateView):
+class ReporteProduccionAgenteView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/produccion_agente.html"
 
     def get(self, request, *args, **kwargs):
@@ -709,7 +716,8 @@ class ReporteProduccionAgenteView(TemplateView):
 
 User = get_user_model()
 
-class ReporteConversionAgenteView(TemplateView):
+class ReporteConversionAgenteView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "accounts.view_reportes"
     template_name = "ui/reportes/conversion_agente.html"
 
     def get(self, request, *args, **kwargs):

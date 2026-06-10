@@ -38,6 +38,7 @@ class QuoteResult:
     coberturas: List[Dict[str, Any]] = None
     reglas: List[Dict[str, Any]] = None
 
+from django.conf import settings
 
 class RatingEngine:
     """
@@ -47,7 +48,7 @@ class RatingEngine:
     """
 
     MAX_ITEMS = 3
-    IVA_RATE = Decimal("0.16")
+    IVA_RATE = settings.IVA_RATE
     DERECHOS_FIJO = Decimal("450.00")
 
     def quote(self, cotizacion) -> List[QuoteResult]:
@@ -66,7 +67,7 @@ class RatingEngine:
         combos = combos[: self.MAX_ITEMS]  # tomamos hasta N combos únicos
 
         # 2) Calcular base “demostrativa” con datos de cotización
-        # Puedes hacer algo más sofisticado luego (año, tipo_uso, etc.)
+        # Se Puede hacer algo más sofisticado luego (año, tipo_uso, etc.)
         prima_base = self._prima_base(cotizacion)
 
         results: List[QuoteResult] = []

@@ -26,7 +26,7 @@
 
   <!-- KPIs -->
   <div class="col-12 col-md-4">
-    <div class="card">
+    <div class="card h-100">
       <div class="card-body">
         <div class="text-muted small">Cotizaciones activas</div>
         <div class="display-6">{{ cotizaciones_activas_count }}</div>
@@ -35,7 +35,7 @@
   </div>
 
   <div class="col-12 col-md-4">
-    <div class="card">
+    <div class="card h-100">
       <div class="card-body">
         <div class="text-muted small">Pólizas vigentes</div>
         <div class="display-6">{{ polizas_vigentes_count }}</div>
@@ -44,7 +44,7 @@
   </div>
 
   <div class="col-12 col-md-4">
-    <div class="card">
+    <div class="card h-100">
       <div class="card-body">
         <div class="text-muted small">Recibos pendientes</div>
         <div class="display-6">{{ pagos_pendientes_count }}</div>
@@ -141,7 +141,7 @@
   </div>
 
   <!-- Pagos Pendientes-->
-  <div class="col-12 col-lg-6">
+  <div class="col-12 col-lg-12">
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <strong>Pagos pendientes</strong>
@@ -159,6 +159,7 @@
                   <th>Aseguradora</th>
                   <th class="text-end">Monto</th>
                   <th class="text-end">Estatus</th>
+                  <th class="text-end">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -175,6 +176,16 @@
                       <span class="badge text-bg-warning">Pendiente</span>
                     {% endif %}
                   </td>
+                  <td>
+                    <form method="post"
+                        action="{% url 'portal:pago_checkout' pk=p.id %}"
+                        class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            Pagar con MercadoPago
+                        </button>
+                    </form>
+                  </td>  
                 </tr>
                 {% endfor %}
               </tbody>
@@ -188,7 +199,7 @@
   </div>
 
   <!-- Pagos Pagados -->
-  <div class="col-12 col-lg-6">
+  <div class="col-12 col-lg-12">
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <strong>Pagos recientes</strong>

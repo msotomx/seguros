@@ -1,0 +1,111 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="row justify-content-center">
+    <div class="col-lg-9">
+
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">{% if object %}Editar vehículo de catálogo{% else %}Nuevo vehículo de catálogo{% endif %}</h5>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+          <div class="card-body">
+            {{ form.non_field_errors }}
+
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="{{ form.marca.id_for_label }}" class="form-label">Marca</label>
+                {{ form.marca }}
+                <div class="text-danger small">{{ form.marca.errors }}</div>
+              </div>
+
+              <div class="col-md-6">
+                <label for="{{ form.submarca.id_for_label }}" class="form-label">Submarca</label>
+                {{ form.submarca }}
+                <div class="text-danger small">{{ form.submarca.errors }}</div>
+              </div>
+
+              <div class="col-md-3">
+                <label for="{{ form.anio.id_for_label }}" class="form-label">Año</label>
+                {{ form.anio }}
+                <div class="text-danger small">{{ form.anio.errors }}</div>
+              </div>
+
+              <div class="col-md-9">
+                <label for="{{ form.version.id_for_label }}" class="form-label">Versión</label>
+                {{ form.version }}
+                <div class="text-danger small">{{ form.version.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label for="{{ form.clave_amis.id_for_label }}" class="form-label">Clave AMIS</label>
+                {{ form.clave_amis }}
+                <div class="text-danger small">{{ form.clave_amis.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Tipo vehículo</label>
+                {{ form.tipo_vehiculo }}
+                <div class="text-danger small">{{ form.tipo_vehiculo.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Valor referencia</label>
+                {{ form.valor_referencia }}
+                <div class="text-danger small">{{ form.valor_referencia.errors }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer bg-white d-flex justify-content-end gap-2">
+            <a href="{% url 'ui:vehiculo_catalogo_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const marcaSelect = document.getElementById("id_marca");
+    const submarcaSelect = document.getElementById("id_submarca");
+
+    function resetSelect(select, placeholder) {
+        select.innerHTML = "";
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholder;
+        select.appendChild(opt);
+    }
+
+    marcaSelect.addEventListener("change", function () {
+        const marcaId = marcaSelect.value;
+
+        resetSelect(submarcaSelect, "Selecciona submarca");
+
+        if (!marcaId) return;
+
+        fetch("{% url 'ui:ajax_submarcas_por_marca' %}?marca_id=" + marcaId)
+            .then(response => response.json())
+            .then(data => {
+                data.results.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.id;
+                    opt.textContent = item.nombre;
+                    submarcaSelect.appendChild(opt);
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando submarcas:", error);
+            });
+    });
+});
+</script>
+{% endblock %}

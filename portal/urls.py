@@ -1,8 +1,8 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.views import LoginView, LogoutView
+from django.views.generic import RedirectView
 
-from portal.views.home import PortalHomeView
 from portal.views.dashboard import PortalDashboardView
 from portal.views.perfil import PortalPerfilView
 from portal.views.cotizar import PortalCotizarCreateView
@@ -12,11 +12,14 @@ from portal.views.home import AccesoSuspendidoView
 from portal.views.polizas import PortalPolizaListView
 from portal.views.pagos import PortalPagoListView, PortalPagoDetailView
 from portal.views.pagos import PortalPagoCheckoutView, PortalPagoReturnView
+from portal.views.ajax import portal_ajax_submarcas_por_marca, portal_ajax_catalogos_por_submarca
+from portal.views.cotizar import PortalCotizacionOpcionesView, PortalSeleccionarCotizacionItemView
+from portal.views.cotizar import PortalCotizacionGraciasView
 
 app_name = "portal"
 
 urlpatterns = [
-    path("", PortalHomeView.as_view(), name="home"),
+    path("", RedirectView.as_view(pattern_name="portal:cotizar",permanent=False),name="home"),
     path("dashboard/", PortalDashboardView.as_view(), name="dashboard"),
     path("perfil/", PortalPerfilView.as_view(), name="perfil"),
     path("cotizar/", PortalCotizarCreateView.as_view(), name="cotizar"),
@@ -37,4 +40,13 @@ urlpatterns = [
     path("pagos/<int:pk>/checkout/", PortalPagoCheckoutView.as_view(), name="pago_checkout"),
     # retorno del checkout (MercadoPago)
     path("pagos/return/<str:status>/", PortalPagoReturnView.as_view(), name="pago_return"),
+    # Vehiculo en Portal
+    path("ajax/submarcas/", portal_ajax_submarcas_por_marca, name="ajax_submarcas_por_marca"),
+    path("ajax/catalogos-vehiculo/", portal_ajax_catalogos_por_submarca, name="ajax_catalogos_por_submarca"),
+    path("cotizaciones/<int:pk>/opciones/", PortalCotizacionOpcionesView.as_view(), name="cotizacion_opciones"),
+    path("cotizaciones/<int:pk>/seleccionar/<int:item_id>/", PortalSeleccionarCotizacionItemView.as_view(),
+            name="cotizacion_seleccionar_item"),
+    path("cotizaciones/<int:pk>/gracias/", PortalCotizacionGraciasView.as_view(),
+            name="cotizacion_gracias"),
 ]
+

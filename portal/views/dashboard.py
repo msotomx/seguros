@@ -26,6 +26,10 @@ class PortalDashboardView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         cliente = self.get_cliente()
+        ctx["cliente"] = cliente
+        if not cliente:
+            return ctx
+        
         today = timezone.localdate()
 
         # Cotizaciones activas (si aún las quieres mostrar)

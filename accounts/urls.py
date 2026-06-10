@@ -2,6 +2,7 @@
 from django.urls import path, include
 from .views import RoleBasedLoginView
 from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth import views as auth_views
 
 app_name = "accounts"
 

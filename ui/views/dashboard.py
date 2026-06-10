@@ -28,7 +28,7 @@ def is_internal(user) -> bool:
     return (
         user.is_superuser
         or user.is_staff
-        or user.groups.filter(name__in=["Admin", "Supervisor", "Agente"]).exists()
+        or user.groups.filter(name__in=["Admin", "Supervisor", "Agente", "Operador", "Lectura"]).exists()
     )
 
 def month_range(today: date | None = None):
@@ -96,7 +96,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         return redirect("ui:dashboard_basic")
 
-
 # ---------------------------------------------------------------------
 # 2) Dashboard básico / fallback
 # ---------------------------------------------------------------------
@@ -107,7 +106,6 @@ class BasicDashboardView(LoginRequiredMixin, InternalRequiredMixin, TemplateView
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         return ctx
-
 
 # ---------------------------------------------------------------------
 # 3) Dashboard Agente
@@ -162,7 +160,6 @@ from django.views.generic import TemplateView
 from crm.models import Cliente
 from finanzas.models import Pago, Comision
 from polizas.models import Poliza, PolizaEvento
-
 
 class SupervisorDashboardView(LoginRequiredMixin, SupervisorRequiredMixin, TemplateView):
     template_name = "ui/dashboard/supervisor.html"
@@ -304,6 +301,27 @@ class SupervisorDashboardView(LoginRequiredMixin, SupervisorRequiredMixin, Templ
             .select_related("cliente", "aseguradora", "agente")
             .order_by("-id")[:10]
         )
+        cotizaciones = Cotizacion.objects.all()
+
+        ctx["cotizaciones_portal_kpi"] = {
+            "aceptadas": cotizaciones.filter(
+                estatus=Cotizacion.Estatus.ACEPTADA,
+                origen="PORTAL_PUBLICO",
+            ).count(),
+            "emitidas_30d": cotizaciones.filter(
+                estatus=Cotizacion.Estatus.EMITIDA,
+                origen="PORTAL_PUBLICO",
+                emitida_at__gte=last_30,
+            ).count(),
+
+            "portal_total": cotizaciones.filter(
+                origen="PORTAL_PUBLICO",
+            ).count(),
+
+            "portal_recientes": cotizaciones.filter(
+                origen="PORTAL_PUBLICO",
+            ).order_by("-created_at")[:5],
+        }
 
         return ctx
 

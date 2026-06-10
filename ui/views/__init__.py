@@ -31,11 +31,19 @@ from ui.views.comisiones import ComisionListView, ComisionGenerarView, ComisionM
 from ui.views.cobranza import CarteraVencidaListView, PagosPorVencerListView, pago_enviar_recordatorio
 from ui.views.cobranza import pago_enviar_recordatorio_whatsapp, ReporteCobranzaAgenteView
 from ui.views.cobranza import ReporteCobranzaAgenteDetalleView, ReporteCobranzaAgenteExcelView
-from ui.views.cobranza import CobranzaMenuView, EstadoCuentaView
+from ui.views.cobranza import CobranzaMenuView, EstadoCuentaView, SeguimientoCobranzaView
+from ui.views.cobranza import EnviarRecordatorioWhatsAppView
 from ui.views.clientes import cliente_estado_cuenta_pdf
 from ui.views.polizas import EndosoCreateView, EndosoUpdateView, EndosoDeleteView
 from ui.views.reportes import ReporteMenuView, ReporteComisionesView, ReporteCarteraVencidaView
 from ui.views.reportes import ReporteRenovacionesView, ReporteProduccionAgenteView, ReporteConversionAgenteView
+from ui.views.autos import MarcaListView, MarcaCreateView, MarcaUpdateView
+from ui.views.autos import SubMarcaListView, SubMarcaCreateView, SubMarcaUpdateView
+from ui.views.autos import VehiculoCatalogoListView, VehiculoCatalogoCreateView, VehiculoCatalogoUpdateView
+from ui.views.autos import VehiculoListView, VehiculoCreateView, VehiculoUpdateView
+from ui.views.autos_ajax import ajax_submarcas_por_marca, ajax_catalogos_por_submarca
+from ui.views.usuarios import UsuarioListView, UsuarioCreateView, UsuarioUpdateView, UsuarioToggleActivoView
+from ui.views.usuarios import CambiarPasswordView, CambiarPasswordDoneView
 
 __all__ = [
     "DashboardView",
@@ -87,5 +95,10 @@ __all__ = [
     "EndosoCreateView", "EndosoUpdateView", "EndosoDeleteView",
     "ReporteMenuView", "ReporteComisionesView", "ReporteCarteraVencidaView",
     "ReporteRenovacionesView", "ReporteProduccionAgenteView", "ReporteConversionAgenteView",
-    "EstadoCuentaView",
+    "EstadoCuentaView", 
+    "SeguimientoCobranzaView",
+    "ajax_submarcas_por_marca", "ajax_catalogos_por_submarca",
+    "EnviarRecordatorioWhatsAppView",
+    "UsuarioListView", "UsuarioCreateView", "UsuarioUpdateView", "UsuarioToggleActivoView",
+    "CambiarPasswordView", "CambiarPasswordDoneView",
 ]

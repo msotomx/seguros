@@ -21,8 +21,7 @@ class UserProfile(TimeStampedModel):
     rol = models.CharField(max_length=10, choices=Rol.choices, default=Rol.AGENTE, db_index=True)
     telefono = models.CharField(max_length=30, blank=True, default="")
     notas = models.TextField(blank=True, default="")
-    activo = models.BooleanField(default=True, db_index=True)
-
+    
     # Alcance opcional (si quieres restringir qué aseguradoras ve un usuario)
     aseguradoras_permitidas = models.ManyToManyField(
         "catalogos.Aseguradora", blank=True, related_name="usuarios_permitidos"
@@ -37,4 +36,9 @@ class UserProfile(TimeStampedModel):
             ("can_manage_tariffs", "Puede administrar tarifas y reglas"),
             ("can_view_finance", "Puede ver finanzas (pagos/comisiones)"),
             ("can_manage_finance", "Puede administrar finanzas (pagos/comisiones)"),
+            ("view_reportes", "Puede ver reportes"),
+            ("view_cobranza", "Puede ver cobranza"),
+            ("manage_comisiones", "Puede administrar comisiones"),
+            ("manage_pagos", "Puede administrar pagos"),
+            ("emitir_poliza", "Puede emitir pólizas"),
         ]

@@ -1,0 +1,357 @@
+{% extends "portal/base.html" %}
+{% block title %}Cotizar{% endblock %}
+
+{% block content %}
+<style>
+  /* Fondo general de la pantalla */
+  .cotizar-wrap{
+    background: #eaf3ff; /* azul claro */
+    border-radius: 14px;
+    padding: 18px;
+  }
+  /* Paneles/secciones */
+  .cotizar-panel{
+    background: #ffffff;
+    border: 1px solid rgba(13, 59, 102, .10);
+    border-radius: 14px;
+    box-shadow: 0 .25rem .75rem rgba(0,0,0,.04);
+  }
+  .cotizar-panel__head{
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(13, 59, 102, .08);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .cotizar-panel__title{
+    margin:0;
+    font-size: 1.05rem;     /* no grande */
+    font-weight: 700;
+    color: #0D3B66;
+    letter-spacing: .2px;
+  }
+  .cotizar-panel__sub{
+    margin:0;
+    font-size: .85rem;
+    color: #57718a;
+  }
+  .cotizar-panel__body{
+    padding: 14px;
+  }
+
+  /* Labels compactos */
+  .cotizar-label{
+    font-size: .85rem;
+    font-weight: 600;
+    color:#2c3e50;
+    margin-bottom: .35rem;
+  }
+  /* Inputs un poco más compactos */
+  .cotizar-wrap .form-control,
+  .cotizar-wrap .form-select{
+    padding: .45rem .6rem;
+    font-size: .92rem;
+    border-radius: .6rem;
+  }
+  .cotizar-wrap .form-text{
+    font-size: .78rem;
+    color:#6b7f95;
+  }
+
+  /* Separador suave */
+  .cotizar-sep{
+    height: 1px;
+    background: rgba(13,59,102,.08);
+    margin: 10px 0 12px;
+  }
+
+  /* Sticky bar para el botón en mobile */
+  .cotizar-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:.5rem;
+  }
+  @media (max-width: 576px){
+    .cotizar-actions{
+      position: sticky;
+      bottom: 10px;
+      z-index: 5;
+      background: rgba(234,243,255,.85);
+      backdrop-filter: blur(6px);
+      padding: 10px;
+      border-radius: 14px;
+      justify-content: stretch;
+    }
+    .cotizar-actions .btn{
+      width: 100%;
+    }
+  }
+
+  /* Errores de Django más limpios */
+  .errorlist{
+    margin: .25rem 0 0;
+    padding-left: 1rem;
+    color: #b02a37;
+    font-size: .82rem;
+  }
+</style>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-9">
+    <div class="cotizar-wrap">
+
+      <div class="cotizar-panel">
+        <div class="cotizar-panel__head">
+          <div>
+            <h1 class="cotizar-panel__title">Cotiza tu seguro</h1>
+            <p class="cotizar-panel__sub">Captura los datos de la póliza.</p>
+          </div>
+          <span class="badge text-bg-primary">Portal</span>
+        </div>
+
+        <div class="cotizar-panel__body">
+
+          {% if form.errors %}
+            <div class="alert alert-danger py-2 mb-3">
+              <strong>Revisa el formulario:</strong>
+              <div class="small mt-1">Hay campos con información faltante o inválida.</div>
+            </div>
+          {% endif %}
+          {{ form.non_field_errors }}
+
+          <form method="post" class="row g-3" novalidate>
+            {% csrf_token %}
+
+            <!-- Sección: Datos de contacto -->
+            <div class="col-12">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold" style="color:#0D3B66;">Contacto</div>
+                <span class="text-muted small">Paso 1 de 2</span>
+              </div>
+              <div class="cotizar-sep"></div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Tipo de cliente</label>
+              {{ form.tipo_cliente }}
+              {{ form.tipo_cliente.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Email</label>
+              {{ form.email }}
+              {{ form.email.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Teléfono</label>
+              {{ form.telefono }}
+              {{ form.telefono.errors }}
+            </div>
+
+            <!-- Sección: Datos del cliente -->
+            <div class="col-12 mt-2">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold" style="color:#0D3B66;">Datos del cliente</div>
+                <span class="text-muted small">Persona / Empresa</span>
+              </div>
+              <div class="cotizar-sep"></div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Nombre</label>
+              {{ form.nombre }}
+              {{ form.nombre.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Apellido paterno</label>
+              {{ form.apellido_paterno }}
+              {{ form.apellido_paterno.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Apellido materno</label>
+              {{ form.apellido_materno }}
+              {{ form.apellido_materno.errors }}
+            </div>
+
+            <div class="col-12">
+              <label class="cotizar-label">Nombre comercial <span class="text-muted fw-normal">(si es empresa)</span></label>
+              {{ form.nombre_comercial }}
+              {{ form.nombre_comercial.errors }}
+            </div>
+
+            <!-- Sección: Vehículo -->
+            <div class="col-12 mt-2">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="fw-semibold" style="color:#0D3B66;">Vehículo</div>
+                <span class="text-muted small">Paso 2 de 2</span>
+              </div>
+              <div class="cotizar-sep"></div>
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Tipo de uso</label>
+              {{ form.tipo_uso }}
+              {{ form.tipo_uso.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Año</label>
+              {{ form.modelo_anio }}
+              {{ form.modelo_anio.errors }}
+            </div>
+
+            <div class="col-12 col-md-4">
+              <label class="cotizar-label">Placas</label>
+              {{ form.placas }}
+              {{ form.placas.errors }}
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="cotizar-label">Marca</label>
+              {{ form.marca }}
+              {{ form.marca.errors }}
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="cotizar-label">Submarca</label>
+              {{ form.submarca }}
+              {{ form.submarca.errors }}
+            </div>
+
+            <div class="col-12">
+              <label class="cotizar-label">Versión</label>
+              {{ form.catalogo }}
+              {{ form.catalogo.errors }}
+              <div class="form-text">Selecciona marca → submarca → año para ver versiones disponibles.</div>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="cotizar-label">Num Serie <span class="text-muted fw-normal">(opcional)</span></label>
+              {{ form.vin }}
+              {{ form.vin.errors }}
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="cotizar-label">Notas <span class="text-muted fw-normal">(opcional)</span></label>
+              {{ form.notas }}
+              {{ form.notas.errors }}
+            </div>
+
+            <div class="col-12">
+              <div class="cotizar-actions mt-2">
+                <button class="btn btn-primary" type="submit">
+                  Solicitar cotización
+                </button>
+              </div>
+              <div class="text-muted small mt-2">
+                Al enviar, un asesor puede contactarte para confirmar información.
+              </div>
+            </div>
+
+          </form>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const marcaSelect = document.getElementById("id_marca");
+    const submarcaSelect = document.getElementById("id_submarca");
+    const anioSelect = document.getElementById("id_modelo_anio");
+    const catalogoSelect = document.getElementById("id_catalogo");
+
+    function resetSelect(select, placeholder) {
+        if (!select) return;
+
+        select.innerHTML = "";
+
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholder;
+
+        select.appendChild(opt);
+    }
+
+    function cargarSubmarcas() {
+        const marcaId = marcaSelect ? marcaSelect.value : "";
+
+        resetSelect(submarcaSelect, "Selecciona submarca");
+        resetSelect(catalogoSelect, "Selecciona versión");
+
+        if (!marcaId) return;
+
+        fetch(`{% url 'portal:ajax_submarcas_por_marca' %}?marca_id=${marcaId}`)
+            .then(response => response.json())
+            .then(data => {
+                data.results.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.id;
+                    opt.textContent = item.nombre;
+                    submarcaSelect.appendChild(opt);
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando submarcas:", error);
+            });
+    }
+
+    function cargarCatalogos() {
+        const submarcaId = submarcaSelect ? submarcaSelect.value : "";
+        const anio = anioSelect ? anioSelect.value : "";
+
+        resetSelect(catalogoSelect, "Selecciona versión");
+
+        if (!submarcaId) return;
+
+        let url = `{% url 'portal:ajax_catalogos_por_submarca' %}?submarca_id=${submarcaId}`;
+
+        if (anio) {
+            url += `&anio=${anio}`;
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.results.length) {
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.textContent = "No hay versiones para esta selección";
+                    catalogoSelect.appendChild(opt);
+                    return;
+                }
+
+                data.results.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.id;
+                    opt.textContent = item.label;
+                    catalogoSelect.appendChild(opt);
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando versiones:", error);
+            });
+    }
+
+    if (marcaSelect) {
+        marcaSelect.addEventListener("change", cargarSubmarcas);
+    }
+
+    if (submarcaSelect) {
+        submarcaSelect.addEventListener("change", cargarCatalogos);
+    }
+
+    if (anioSelect) {
+        anioSelect.addEventListener("change", cargarCatalogos);
+    }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "portal/base.html" %}
+
+{% block content %}
+<div class="container py-5">
+
+  <div class="mb-4">
+    <h3 class="mb-1">Opciones de cotización</h3>
+    <p class="text-muted mb-0">
+      Selecciona la opción que mejor se adapte a tus necesidades.
+    </p>
+  </div>
+
+  {% if items %}
+    <div class="row g-4">
+      {% for item in items %}
+      <div class="col-md-4">
+        <div class="card shadow-sm border-0 h-100 {% if item.seleccionada %}border border-success{% endif %}">
+          <div class="card-body d-flex flex-column">
+
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <h5 class="mb-1">{{ item.aseguradora }}</h5>
+                <div class="text-muted small">{{ item.producto }}</div>
+              </div>
+
+              {% if item.seleccionada %}
+                <span class="badge text-bg-success">Seleccionada</span>
+              {% else %}
+                <span class="badge text-bg-light text-dark">Opción {{ item.ranking }}</span>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <div class="text-muted small">Prima total</div>
+              <div class="fs-3 fw-bold text-primary">
+                ${{ item.prima_total }}
+              </div>
+            </div>
+
+            <div class="small text-muted mb-3">
+              <div>Prima neta: ${{ item.prima_neta }}</div>
+              <div>Derechos: ${{ item.derechos }}</div>
+              <div>IVA: ${{ item.iva }}</div>
+            </div>
+
+            <form method="post"
+                  action="{% url 'portal:cotizacion_seleccionar_item' cotizacion.pk item.pk %}"
+                  class="mt-auto">
+              {% csrf_token %}
+              <button class="btn btn-primary w-100"
+                      {% if item.seleccionada %}disabled{% endif %}>
+                {% if item.seleccionada %}
+                  Opción seleccionada
+                {% else %}
+                  Seleccionar opción
+                {% endif %}
+              </button>
+            </form>
+
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-warning">
+      No se encontraron opciones disponibles para esta cotización.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

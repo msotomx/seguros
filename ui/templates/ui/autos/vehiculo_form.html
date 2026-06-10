@@ -1,0 +1,261 @@
+{% extends "ui/base.html" %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h5 class="mb-0">
+            {% if object %}Editar vehículo{% else %}Nuevo vehículo{% endif %}
+          </h5>
+        </div>
+
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="card-body">
+            {{ form.non_field_errors }}
+
+            <div class="row g-3">
+
+              <div class="col-md-6">
+                <label class="form-label">Cliente</label>
+                {{ form.cliente }}
+                <div class="text-danger small">{{ form.cliente.errors }}</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Tipo de uso</label>
+                {{ form.tipo_uso }}
+                <div class="text-danger small">{{ form.tipo_uso.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Marca</label>
+                {{ form.marca }}
+                <div class="text-danger small">{{ form.marca.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Submarca</label>
+                {{ form.submarca }}
+                <div class="text-danger small">{{ form.submarca.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Año modelo</label>
+                {{ form.modelo_anio }}
+                <div class="text-danger small">{{ form.modelo_anio.errors }}</div>
+              </div>
+
+              <div class="col-md-12">
+                <label class="form-label">Versión / Catálogo</label>
+                {{ form.catalogo }}
+                <div class="text-danger small">{{ form.catalogo.errors }}</div>
+                <div class="form-text">
+                  Selecciona marca, submarca y año para cargar las versiones disponibles.
+                  Si el vehículo no existe en catálogo, puedes capturar los datos manualmente.
+                </div>
+              </div>
+
+
+              <div class="col-md-4">
+                <label class="form-label">VIN</label>
+                {{ form.vin }}
+                <div class="text-danger small">{{ form.vin.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Serie motor</label>
+                {{ form.serie_motor }}
+                <div class="text-danger small">{{ form.serie_motor.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Placas</label>
+                {{ form.placas }}
+                <div class="text-danger small">{{ form.placas.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Color</label>
+                {{ form.color }}
+                <div class="text-danger small">{{ form.color.errors }}</div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label">Valor comercial</label>
+                {{ form.valor_comercial }}
+                <div class="text-danger small">{{ form.valor_comercial.errors }}</div>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Adaptaciones</label>
+                {{ form.adaptaciones }}
+                <div class="text-danger small">{{ form.adaptaciones.errors }}</div>
+              </div>
+
+            </div>
+          </div>
+
+          <div class="card-footer bg-white d-flex justify-content-end gap-2">
+            <a href="{% url 'ui:vehiculo_list' %}" class="btn btn-outline-secondary">
+              Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+              Guardar
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const marcaSelect = document.getElementById("id_marca_ajax");
+    const submarcaSelect = document.getElementById("id_submarca_ajax");
+    const anioSelect = document.getElementById("id_modelo_anio");
+    const catalogoSelect = document.getElementById("id_catalogo_ajax");
+
+    const marcaTexto = document.getElementById("id_marca_texto");
+    const submarcaTexto = document.getElementById("id_submarca_texto");
+    const versionInput = document.getElementById("id_version");
+    const tipoVehiculoInput = document.getElementById("id_tipo_vehiculo");
+    const valorComercialInput = document.getElementById("id_valor_comercial");
+
+    function resetSelect(select, placeholder) {
+        if (!select) return;
+
+        select.innerHTML = "";
+
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = placeholder;
+
+        select.appendChild(opt);
+    }
+    
+    // limpiar campos ocultos si cambia marca, submarca, año 
+    function limpiarDatosCatalogo() {
+        if (marcaTexto) marcaTexto.value = "";
+        if (submarcaTexto) submarcaTexto.value = "";
+        if (versionInput) versionInput.value = "";
+        if (tipoVehiculoInput) tipoVehiculoInput.value = "";
+        if (valorComercialInput) valorComercialInput.value = "";
+    }
+
+    function cargarSubmarcas() {
+        const marcaId = marcaSelect ? marcaSelect.value : "";
+
+        limpiarDatosCatalogo();
+
+        resetSelect(submarcaSelect, "Selecciona submarca");
+        resetSelect(catalogoSelect, "Selecciona versión");
+
+        if (!marcaId) return;
+
+        fetch(`{% url 'ui:ajax_submarcas_por_marca' %}?marca_id=${marcaId}`)
+            .then(response => response.json())
+            .then(data => {
+                data.results.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.id;
+                    opt.textContent = item.nombre;
+                    submarcaSelect.appendChild(opt);
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando submarcas:", error);
+            });
+    }
+
+    function cargarCatalogos() {
+        const submarcaId = submarcaSelect ? submarcaSelect.value : "";
+        const anio = anioSelect ? anioSelect.value : "";
+
+        limpiarDatosCatalogo();
+
+        resetSelect(catalogoSelect, "Selecciona versión");
+
+        if (!submarcaId) return;
+
+        let url = `{% url 'ui:ajax_catalogos_por_submarca' %}?submarca_id=${submarcaId}`;
+
+        if (anio) {
+            url += `&anio=${anio}`;
+        }
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                if (!data.results.length) {
+                    const opt = document.createElement("option");
+                    opt.value = "";
+                    opt.textContent = "No hay versiones para esta selección";
+                    catalogoSelect.appendChild(opt);
+                    return;
+                }
+
+                data.results.forEach(item => {
+                    const opt = document.createElement("option");
+                    opt.value = item.id;
+                    opt.textContent = item.label;
+
+                    opt.dataset.marca = item.marca || "";
+                    opt.dataset.submarca = item.submarca || "";
+                    opt.dataset.anio = item.anio || "";
+                    opt.dataset.version = item.version || "";
+                    opt.dataset.tipoVehiculo = item.tipo_vehiculo || "";
+                    opt.dataset.valorReferencia = item.valor_referencia || "";
+
+                    catalogoSelect.appendChild(opt);
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando catálogo de vehículos:", error);
+            });
+    }
+
+    function aplicarCatalogoSeleccionado() {
+        if (!catalogoSelect) return;
+
+        const selected = catalogoSelect.options[catalogoSelect.selectedIndex];
+
+        if (!selected || !selected.value) return;
+
+        if (marcaTexto) marcaTexto.value = selected.dataset.marca || "";
+        if (submarcaTexto) submarcaTexto.value = selected.dataset.submarca || "";
+        if (versionInput) versionInput.value = selected.dataset.version || "";
+        if (tipoVehiculoInput) tipoVehiculoInput.value = selected.dataset.tipoVehiculo || "";
+
+        if (valorComercialInput && selected.dataset.valorReferencia) {
+            valorComercialInput.value = selected.dataset.valorReferencia;
+        }
+    }
+
+    if (marcaSelect) {
+        marcaSelect.addEventListener("change", cargarSubmarcas);
+    }
+
+    if (submarcaSelect) {
+        submarcaSelect.addEventListener("change", cargarCatalogos);
+    }
+
+    if (anioSelect) {
+        anioSelect.addEventListener("change", cargarCatalogos);
+    }
+
+    if (catalogoSelect) {
+        catalogoSelect.addEventListener("change", aplicarCatalogoSeleccionado);
+    }
+});
+</script>
+{% endblock %}

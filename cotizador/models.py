@@ -58,9 +58,14 @@ class Cotizacion(TimeStampedModel):
         ACEPTADA = "ACEPTADA", "Aceptada"
         RECHAZADA = "RECHAZADA", "Rechazada"
         VENCIDA = "VENCIDA", "Vencida"
+        EMITIDA = "Emitida", "Emitida"
 
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
+    codigo_postal = models.CharField(max_length=5, blank=True, default="", db_index=True)
+    ciudad = models.CharField(max_length=100, blank=True, default="")
+    estado = models.CharField(max_length=100, blank=True, default="")
+
     flotilla = models.ForeignKey(Flotilla, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
     
     tipo_cotizacion = models.CharField(max_length=20, choices=Tipo.choices, db_index=True)
@@ -87,6 +92,7 @@ class Cotizacion(TimeStampedModel):
         blank=True,
         related_name="cotizaciones_creadas",
     )
+    emitida_at = models.DateTimeField(null=True, blank=True, db_index=True) # en esta fecha se emitio la poliza de esta cotizacion
 
     class Meta:
         constraints = [

@@ -24,6 +24,9 @@ from cotizador.models import Cotizacion, CotizacionItem
 def _is_admin(user) -> bool:
     return user.is_superuser or user.groups.filter(name="Admin").exists()
 
+def _is_supervisor(user) -> bool:
+    return user.groups.filter(name="Supervisor").exists()
+
 class CotizacionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = "cotizador.view_cotizacion"
     template_name = "ui/cotizador/cotizacion_list.html"
@@ -40,7 +43,8 @@ class CotizacionListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         user = self.request.user
 
         # Si NO es admin, por defecto solo su cartera
-        if not (user.is_superuser or user.groups.filter(name="Admin").exists()):
+        if not (user.is_superuser or user.groups.filter(name="Admin").exists() or 
+                user.groups.filter(name="Supervisor").exists()):
             qs = qs.filter(owner=user)
 
         # Filtros
@@ -96,7 +100,8 @@ class CotizacionDetailView(DetailView):
 
         # Regla de cartera: si no es Admin/superuser, solo puede ver sus cotizaciones
         is_admin = user.is_superuser or user.groups.filter(name="Admin").exists()
-        if not is_admin and obj.owner_id != user.id:
+        is_supervisor = user.groups.filter(name="Supervisor").exists()
+        if not (is_admin or is_supervisor) and obj.owner_id != user.id:
             raise PermissionError("No autorizado para ver esta cotización.")
         return obj
 
@@ -125,7 +130,7 @@ class CotizacionDetailView(DetailView):
         ctx["can_emitir"] = (
             ctx["selected_item"] is not None
             and self.request.user.has_perm("polizas.add_poliza")
-            and self.object.estatus in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA]
+            and self.object.estatus in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA, Cotizacion.Estatus.ACEPTADA]
         )
 
         return ctx
@@ -145,7 +150,7 @@ class CotizacionItemDetailView(LoginRequiredMixin, DetailView):
         obj = super().get_object(queryset=queryset)
 
         # Cartera: si no es admin, debe ser owner de la cotización
-        if not _is_admin(self.request.user):
+        if not (_is_admin(self.request.user) or (_is_supervisor(self.request.user))): 
             if obj.cotizacion.owner_id != self.request.user.id:
                 raise PermissionError("No autorizado para ver este item.")
         return obj
@@ -221,7 +226,7 @@ class CotizacionWizardClienteSelectView(LoginRequiredMixin, PermissionRequiredMi
     Wizard - Paso 1: buscar/seleccionar cliente.
     Guarda cliente_id en session y manda al paso 2.
     """
-    permission_required = "crm.view_cliente"
+    permission_required = "accounts.can_quote"
     template_name = "ui/cotizador/wizard_cliente_select.html"
     context_object_name = "clientes"
     paginate_by = 15
@@ -472,7 +477,7 @@ def cotizacion_calcular(request, pk: int):
     """
     cot = get_object_or_404(Cotizacion, pk=pk)
 
-    # Regla de estatus para recalcular (ajústala a tu gusto)
+    # Regla de estatus
     if cot.estatus not in [Cotizacion.Estatus.BORRADOR, Cotizacion.Estatus.ENVIADA]:
         messages.warning(request, "Esta cotización ya no se puede recalcular.")
         return redirect("ui:cotizacion_detail", pk=cot.pk)
@@ -607,6 +612,9 @@ from django.db import transaction
 from polizas.models import Poliza
 from polizas.models import PolizaEvento
 from polizas.services import log_poliza_event
+from portal.services import crear_acceso_portal_cliente
+from integrations.whatsapp import enviar_acceso_portal_whatsapp, WhatsAppError
+import inspect
 
 
 @require_POST
@@ -630,7 +638,8 @@ def cotizacion_emitir_poliza(request, pk: int):
     # cartera
     user = request.user
     is_admin = user.is_superuser or user.groups.filter(name="Admin").exists()
-    if not is_admin and cot.owner_id != user.id:
+    is_supervisor = user.groups.filter(name="Supervisor").exists()
+    if not (is_admin or is_supervisor) and cot.owner_id != user.id:
         messages.error(request, "No autorizado para emitir póliza de esta cotización.")
         return redirect("ui:cotizacion_detail", pk=cot.pk)
 
@@ -680,9 +689,37 @@ def cotizacion_emitir_poliza(request, pk: int):
             agente=cot.owner,
         )
 
-        # Marcar la cotización como ACEPTADA (por el cliente)
-        cot.estatus = Cotizacion.Estatus.ACEPTADA
-        cot.save(update_fields=["estatus"])
+        # Marcar la cotización como EMITIDA
+        cot.estatus = Cotizacion.Estatus.EMITIDA
+        cot.emitida_at = timezone.now()
+        cot.save(update_fields=["estatus", "emitida_at"])
+
+    # Crear Usuario para el Cliente Portal
+    if poliza.cotizacion_item:
+        cotizacion = poliza.cotizacion_item.cotizacion
+        if cotizacion.origen == "PORTAL_PUBLICO":
+            resultado = crear_acceso_portal_cliente(poliza.cliente)
+
+            user_portal = resultado["user"]
+            password_temporal = resultado["password_temporal"]
+            created = resultado["created"]
+
+            if created and password_temporal:
+                try:
+
+                    enviar_acceso_portal_whatsapp(
+                        cliente=poliza.cliente,
+                        user=user_portal,
+                        password_temporal=password_temporal,
+                    )
+
+                    messages.success(request, "Acceso al portal enviado por WhatsApp.")
+
+                except Exception as e:
+                    messages.warning(
+                        request,
+                        f"La póliza se emitió, pero no se pudo enviar WhatsApp: {e}"
+                    )
 
     log_poliza_event(
         poliza=poliza,

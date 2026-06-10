@@ -1,0 +1,212 @@
+{% extends "portal/base.html" %}
+{% block title %}Opciones de cotización{% endblock %}
+
+{% block content %}
+
+<style>
+  .options-wrap {
+    background: #f5f8fb;
+    min-height: calc(100vh - 80px);
+  }
+
+  .options-hero {
+    background: linear-gradient(135deg, #0D3B66 0%, #145DA0 100%);
+    color: #fff;
+    border-radius: 24px;
+    padding: 32px;
+    box-shadow: 0 18px 50px rgba(13, 59, 102, .18);
+  }
+
+  .option-card {
+    border: 0;
+    border-radius: 22px;
+    box-shadow: 0 14px 36px rgba(15, 23, 42, .08);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+
+  .option-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, .12);
+  }
+
+  .option-card-selected {
+    border: 2px solid #198754 !important;
+  }
+
+  .price-box {
+    background: #f8fafc;
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  .price-total {
+    color: #0D3B66;
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eef2f6;
+    font-size: .92rem;
+  }
+
+  .detail-row:last-child {
+    border-bottom: 0;
+  }
+
+  .trust-line {
+    color: #64748b;
+    font-size: .9rem;
+  }
+
+  .folio-pill {
+    background: rgba(255,255,255,.13);
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px;
+    padding: 8px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+</style>
+
+<div class="options-wrap py-5">
+  <div class="container">
+
+    <div class="options-hero mb-4">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+          <div class="folio-pill mb-3">
+            <i class="bi bi-shield-check"></i>
+            Folio {{ cotizacion.folio }}
+          </div>
+
+          <h1 class="fw-bold mb-2">
+            Opciones disponibles para tu seguro de auto
+          </h1>
+
+          <p class="mb-0" style="opacity:.9;">
+            Compara las alternativas generadas para tu vehículo y selecciona la opción que mejor se ajuste a tus necesidades.
+          </p>
+        </div>
+
+        <div class="col-lg-4 text-lg-end">
+          <a href="{% url 'portal:cotizar' %}" class="btn btn-light">
+            Nueva cotización
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {% if items %}
+      <div class="row g-4">
+        {% for item in items %}
+        <div class="col-md-6 col-xl-4">
+          <div class="card option-card h-100 {% if item.seleccionada %}option-card-selected{% endif %}">
+            <div class="card-body d-flex flex-column p-4">
+
+              <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                  <div class="text-muted small">Aseguradora</div>
+                  <h5 class="fw-bold mb-1">{{ item.aseguradora }}</h5>
+                  <div class="text-muted small">{{ item.producto }}</div>
+                </div>
+
+                {% if item.seleccionada %}
+                  <span class="badge text-bg-success">Seleccionada</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark border">
+                    Opción {{ item.ranking }}
+                  </span>
+                {% endif %}
+              </div>
+
+              <div class="price-box mb-3">
+                <div class="text-muted small mb-1">Prima total</div>
+                <div class="price-total">
+                  ${{ item.prima_total|floatformat:2 }}
+                </div>
+                <div class="trust-line mt-2">
+                  Importe estimado sujeto a validación final.
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <div class="detail-row">
+                  <span class="text-muted">Prima neta</span>
+                  <strong>${{ item.prima_neta|floatformat:2 }}</strong>
+                </div>
+
+                <div class="detail-row">
+                  <span class="text-muted">Derechos</span>
+                  <strong>${{ item.derechos|floatformat:2 }}</strong>
+                </div>
+
+                <div class="detail-row">
+                  <span class="text-muted">Recargos</span>
+                  <strong>${{ item.recargos|floatformat:2 }}</strong>
+                </div>
+
+                <div class="detail-row">
+                  <span class="text-muted">Descuentos</span>
+                  <strong>${{ item.descuentos|floatformat:2 }}</strong>
+                </div>
+
+                <div class="detail-row">
+                  <span class="text-muted">IVA</span>
+                  <strong>${{ item.iva|floatformat:2 }}</strong>
+                </div>
+              </div>
+
+              <form method="post"
+                    action="{% url 'portal:cotizacion_seleccionar_item' cotizacion.pk item.pk %}"
+                    class="mt-auto">
+                {% csrf_token %}
+
+                <button class="btn {% if item.seleccionada %}btn-success{% else %}btn-primary{% endif %} w-100 btn-lg"
+                        {% if item.seleccionada %}disabled{% endif %}>
+                  {% if item.seleccionada %}
+                    Opción seleccionada
+                  {% else %}
+                    Seleccionar esta opción
+                  {% endif %}
+                </button>
+              </form>
+
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="alert alert-light border mt-4">
+        <div class="fw-semibold mb-1">¿Qué sigue después de seleccionar?</div>
+        <div class="text-muted small">
+          Un agente revisará tu información y te contactará para continuar con la emisión de tu póliza.
+        </div>
+      </div>
+
+    {% else %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+          <div class="display-6 mb-3">⚠️</div>
+          <h4 class="fw-bold">No encontramos opciones disponibles</h4>
+          <p class="text-muted mb-4">
+            Intenta realizar una nueva cotización o comunícate con un agente para recibir apoyo.
+          </p>
+          <a href="{% url 'portal:cotizar' %}" class="btn btn-primary">
+            Nueva cotización
+          </a>
+        </div>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

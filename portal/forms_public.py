@@ -18,6 +18,14 @@ class CotizacionPublicaForm(forms.Form):
         choices=Cliente.TipoCliente.choices,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+    codigo_postal = forms.CharField(
+        required=True,
+        max_length=10,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Ej. 32500"
+        })
+    )
     nombre = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
     apellido_paterno = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
     apellido_materno = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
@@ -65,15 +73,33 @@ class CotizacionPublicaForm(forms.Form):
     def clean(self):
         data = super().clean()
 
-        if data.get("tipo_cliente") == Cliente.TipoCliente.PERSONA:
-            if not data.get("nombre") or not data.get("apellido_paterno"):
-                raise forms.ValidationError("Para persona, nombre y apellido paterno son requeridos.")
+        #if data.get("tipo_cliente") == Cliente.TipoCliente.PERSONA:
+        #    if not data.get("nombre") or not data.get("apellido_paterno"):
+        #        raise forms.ValidationError("Para persona, nombre y apellido paterno son requeridos.")
 
         if data.get("tipo_cliente") == Cliente.TipoCliente.EMPRESA:
             if not data.get("nombre_comercial"):
                 raise forms.ValidationError("Para empresa, el nombre comercial es requerido.")
 
         return data
+
+    vin = forms.CharField(
+        required=False,
+        max_length=17,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "maxlength": "17",
+            "placeholder": "17 caracteres"
+        })
+    )
+
+    def clean_vin(self):
+        vin = (self.cleaned_data.get("vin") or "").strip().upper()
+
+        if vin and len(vin) != 17:
+            raise forms.ValidationError("El VIN debe tener exactamente 17 caracteres.")
+
+        return vin
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

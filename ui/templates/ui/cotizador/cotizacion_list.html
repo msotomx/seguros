@@ -56,7 +56,12 @@
         {% for c in cotizaciones %}
           <tr>
             <td>#{{ c.id }}</td>
-            <td>{{ c.cliente }}</td>
+            <td>
+              <a href="{% url 'ui:cliente_detail' c.cliente.pk %}"
+                class="text-decoration-none fw-semibold">
+                {{ c.cliente }}
+              </a>
+            </td>            
             <td>{{ c.get_tipo_cotizacion_display }}</td>
             <td>{{ c.vigencia_desde }} → {{ c.vigencia_hasta }}</td>
             <td><span class="badge bg-secondary">{{ c.get_estatus_display }}</span></td>

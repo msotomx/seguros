@@ -71,3 +71,88 @@ body {
 .row-parcial {
   background-color: rgba(255, 193, 7, 0.12);
 }
+
+/* Portal */
+
+.cotizar-page {
+  min-height: calc(100vh - 80px);
+  background: linear-gradient(135deg, #f5f8fb 0%, #eef4f8 100%);
+}
+
+.cotizar-hero {
+  background: linear-gradient(135deg, #0D3B66 0%, #145DA0 100%);
+  color: white;
+  border-radius: 28px;
+  padding: 48px;
+  min-height: 620px;
+  position: relative;
+  overflow: hidden;
+}
+
+.cotizar-hero::after {
+  content: "";
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: -80px;
+  bottom: -80px;
+  background: rgba(255,255,255,.08);
+  border-radius: 50%;
+}
+
+.trust-badge {
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  padding: 8px 14px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: .9rem;
+}
+
+.cotizar-card {
+  border: 0;
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(13,59,102,.12);
+}
+
+.cotizar-label {
+  font-weight: 600;
+  color: #243b53;
+  margin-bottom: 6px;
+}
+
+.cotizar-step {
+  display: none;
+}
+
+.cotizar-step.active {
+  display: block;
+}
+
+.step-pill {
+  background: #eef4f8;
+  color: #0D3B66;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.benefit-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.benefit-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}

@@ -118,10 +118,15 @@
                             Enviar recordatorio
                         </button>
                       </form>
-                      <form method="post" action="{% url 'ui:pago_enviar_recordatorio_whatsapp' p.pk %}" class="d-inline">
+                      <form method="post"
+                            action="{% url 'ui:enviar_recordatorio_whatsapp' p.id %}"
+                            class="d-inline">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-success">
-                            WhatsApp
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-success"
+                                onclick="return confirm('¿Enviar recordatorio por WhatsApp?');">
+                          <i class="bi bi-whatsapp me-1"></i>
+                          WhatsApp
                         </button>
                       </form>
 
