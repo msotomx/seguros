@@ -3,6 +3,7 @@
 
 ### Django ###
 *.txt
+!requirements.txt
 *.pub
 *.pptx
 *.pdf
