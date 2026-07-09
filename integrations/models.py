@@ -71,4 +71,44 @@ class IntegrationEvent(models.Model):
 
     def __str__(self):
         return f"{self.provider}:{self.event_type}:{self.event_id} ({self.status})"
-    
+
+# Configuracion de la API    
+class AseguradoraConfiguracion(models.Model):
+    class Provider(models.TextChoices):
+        CHUBB = "CHUBB", "Chubb"
+        AXA = "AXA", "Axa"
+        QUALITAS = "QUALITAS", "Qualitas"
+        GNP = "GNP", "Gnp"
+        GENERAL = "GENERAL", "General"
+
+    class Ambiente(models.TextChoices):
+        SIT = "SIT", "SIT"
+        UAT = "UAT", "UAT"
+        PROD = "PROD", "Producción"
+
+    provider = models.CharField(max_length=30, choices=Provider.choices)
+    ambiente = models.CharField(max_length=20, choices=Ambiente.choices, default=Ambiente.SIT)
+
+    nombre = models.CharField(max_length=120)
+    activo = models.BooleanField(default=True)
+
+    token_url = models.URLField()
+    base_url = models.URLField()
+
+    client_id = models.CharField(max_length=200)
+    client_secret = models.TextField()
+    resource_id = models.CharField(max_length=200)
+    api_version = models.CharField(max_length=10, default="1")
+
+    timeout = models.PositiveIntegerField(default=30)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("provider", "ambiente", "resource_id")
+        verbose_name = "Configuración de aseguradora"
+        verbose_name_plural = "Configuraciones de aseguradoras"
+
+    def __str__(self):
+        return f"{self.nombre} - {self.provider} {self.ambiente}"

@@ -1,0 +1,16 @@
+HEALTH = "/health"
+
+BUSINESS_PROFILES = "/catalogs/business-profiles"
+AGENTS = "/catalogs/agents"
+CALCULATION_TYPES = "/catalogs/calculation-types"
+CURRENCIES = "/catalogs/currencies"
+GROUPINGS = "/catalogs/groupings"
+RATES = "/catalogs/rates"
+PAYMENT_TYPES = "/catalogs/paymenttypes"
+
+VEHICLE_MAKES = "/catalogs/vehicles/makes"
+VEHICLE_SUBMAKES = "/catalogs/vehicles/submakes"
+VEHICLE_TYPES = "/catalogs/vehicles/types"
+VEHICLE_YEARS = "/catalogs/vehicles/years"
+VEHICLES = "/catalogs/vehicles"
+VEHICLE_USES = "/catalogs/vehicles/uses"

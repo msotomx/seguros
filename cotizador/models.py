@@ -146,6 +146,10 @@ class CotizacionItem(TimeStampedModel, MoneyMixin):
     observaciones = models.TextField(blank=True, default="")
     ranking = models.IntegerField(default=0, db_index=True)
     seleccionada = models.BooleanField(default=False, db_index=True)
+    provider = models.CharField(max_length=30, blank=True, default="", db_index=True)
+    provider_quote_id = models.CharField(max_length=100, blank=True, default="", db_index=True)
+    provider_raw_response = models.JSONField(default=dict, blank=True)
+    paquete_nombre = models.CharField(max_length=120, blank=True, default="")
 
     class Meta:
         constraints = [

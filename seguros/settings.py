@@ -124,32 +124,31 @@ TEMPLATES = [
 # ---------------------------------------------------------------------
 # Database (PostgreSQL)
 # ---------------------------------------------------------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("POSTGRES_DB"),
-        "USER": env("POSTGRES_USER"),
-        "PASSWORD": env("POSTGRES_PASSWORD"),
-        "HOST": env("POSTGRES_HOST", default="localhost"),
-        "PORT": env("POSTGRES_PORT", default="5432"),
-        "CONN_MAX_AGE": env.int("POSTGRES_CONN_MAX_AGE", default=60),
-    }
-}
-
 #DATABASES = {
 #    "default": {
-#        "ENGINE": "django.db.backends.mysql",
-#        "NAME": env("MYSQL_DB"),
-#        "USER": env("MYSQL_USER"),
-#        "PASSWORD": env("MYSQL_PASSWORD"),
-#        "HOST": env("MYSQL_HOST", default="localhost"),
-#        "PORT": env("MYSQL_PORT", default="3306"),
-#        "OPTIONS": {
-#            "charset": "utf8mb4",
-#        },
+#        "ENGINE": "django.db.backends.postgresql",
+#        "NAME": env("POSTGRES_DB"),
+#        "USER": env("POSTGRES_USER"),
+#        "PASSWORD": env("POSTGRES_PASSWORD"),
+#        "HOST": env("POSTGRES_HOST", default="localhost"),
+#        "PORT": env("POSTGRES_PORT", default="5432"),
+#        "CONN_MAX_AGE": env.int("POSTGRES_CONN_MAX_AGE", default=60),
 #    }
 #}
 
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": env("MYSQL_DB"),
+        "USER": env("MYSQL_USER"),
+        "PASSWORD": env("MYSQL_PASSWORD"),
+        "HOST": env("MYSQL_HOST", default="localhost"),
+        "PORT": env("MYSQL_PORT", default="3306"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+        },
+    }
+}
 
 # ---------------------------------------------------------------------
 # Password validation
@@ -268,3 +267,13 @@ PUBLIC_BASE_URL = os.getenv(
     "PUBLIC_BASE_URL",
     "http://127.0.0.1:8000"
 )
+
+CHUBB_ENABLED = env.bool("CHUBB_ENABLED", default=False)
+CHUBB_ENV = env("CHUBB_ENV", default="SIT")
+CHUBB_TOKEN_URL = env("CHUBB_TOKEN_URL", default="")
+CHUBB_QUOTES_BASE_URL = env("CHUBB_QUOTES_BASE_URL", default="")
+CHUBB_CLIENT_ID = env("CHUBB_CLIENT_ID", default="")
+CHUBB_CLIENT_SECRET = env("CHUBB_CLIENT_SECRET", default="")
+CHUBB_RESOURCE_ID = env("CHUBB_RESOURCE_ID", default="")
+CHUBB_API_VERSION = env("CHUBB_API_VERSION", default="1")
+CHUBB_TIMEOUT = env.int("CHUBB_TIMEOUT", default=30)

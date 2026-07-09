@@ -1,3 +1,4 @@
+# Providers Externos
 from __future__ import annotations
 
 import hashlib
@@ -62,3 +63,5 @@ class ProviderBusinessIgnore(Exception):
         if self.code:
             return f"[{self.code}] {self.message}"
         return self.message
+
+
