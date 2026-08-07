@@ -1,6 +1,6 @@
 # seguros/settings.py
 # Django 5.2 + PostgreSQL
-# Proyecto: SEGUROS
+# Proyecto: SWITCHH-SEGUROS
 
 from pathlib import Path
 from decimal import Decimal
@@ -150,7 +150,6 @@ DATABASES = {
     }
 }
 
-
 # ---------------------------------------------------------------------
 # Password validation
 # ---------------------------------------------------------------------
@@ -195,13 +194,13 @@ LOGOUT_REDIRECT_URL = "/portal/cotizar/"
 # ---------------------------------------------------------------------
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=not DEBUG)
-CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=not DEBUG)
-SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=not DEBUG)
+SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE",default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE",default=not DEBUG)
+SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT",default=False)
 
-SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0 if DEBUG else 31536000)
-SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=not DEBUG)
-SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=not DEBUG)
+#SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0 if DEBUG else 31536000)
+#SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=not DEBUG)
+#SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=not DEBUG)
 
 # ---------------------------------------------------------------------
 # Default PK
@@ -268,3 +267,13 @@ PUBLIC_BASE_URL = os.getenv(
     "PUBLIC_BASE_URL",
     "http://127.0.0.1:8000"
 )
+
+CHUBB_ENABLED = env.bool("CHUBB_ENABLED", default=False)
+CHUBB_ENV = env("CHUBB_ENV", default="SIT")
+CHUBB_TOKEN_URL = env("CHUBB_TOKEN_URL", default="")
+CHUBB_QUOTES_BASE_URL = env("CHUBB_QUOTES_BASE_URL", default="")
+CHUBB_CLIENT_ID = env("CHUBB_CLIENT_ID", default="")
+CHUBB_CLIENT_SECRET = env("CHUBB_CLIENT_SECRET", default="")
+CHUBB_RESOURCE_ID = env("CHUBB_RESOURCE_ID", default="")
+CHUBB_API_VERSION = env("CHUBB_API_VERSION", default="1")
+CHUBB_TIMEOUT = env.int("CHUBB_TIMEOUT", default=30)

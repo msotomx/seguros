@@ -21,3 +21,26 @@ def get_provider(slug: str) -> Optional[object]:
         return None
     return _PROVIDERS.get(slug.lower())
 
+
+# providers chubb, gnp, axa, etc
+from integrations.providers.insurance_base import (
+    BaseInsuranceProviderAdapter,
+)
+from integrations.providers.contracts import (
+    InsuranceProviderAdapter,
+    QuoteAmount,
+    QuoteInsured,
+    QuoteRequest,
+    QuoteResponse,
+    QuoteVehicle,
+)
+
+__all__ = [
+    "BaseInsuranceProviderAdapter",
+    "InsuranceProviderAdapter",
+    "QuoteAmount",
+    "QuoteInsured",
+    "QuoteRequest",
+    "QuoteResponse",
+    "QuoteVehicle",
+]

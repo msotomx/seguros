@@ -41,13 +41,6 @@ class Cotizacion(TimeStampedModel):
         AGENTE = "AGENTE", "Agente"
         API = "API", "API"
 
-    origen = models.CharField(
-        max_length=20,
-        choices=Origen.choices,
-        default=Origen.CRM,
-        db_index=True,
-    )
-
     class Tipo(models.TextChoices):
         INDIVIDUAL = "INDIVIDUAL", "Individual"
         FLOTILLA = "FLOTILLA", "Flotilla"
@@ -58,10 +51,29 @@ class Cotizacion(TimeStampedModel):
         ACEPTADA = "ACEPTADA", "Aceptada"
         RECHAZADA = "RECHAZADA", "Rechazada"
         VENCIDA = "VENCIDA", "Vencida"
-        EMITIDA = "Emitida", "Emitida"
+        EMITIDA = "EMITIDA", "Emitida"
 
+    class GeneroConductor(models.TextChoices):
+        MASCULINO = "MASCULINO", "Masculino"
+        FEMENINO = "FEMENINO", "Femenino"
+
+    origen = models.CharField(
+        max_length=20,
+        choices=Origen.choices,
+        default=Origen.CRM,
+        db_index=True,
+    )
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
+    conductor_nombre = models.CharField(max_length=120, blank=True, default="")
+    conductor_genero = models.CharField(
+        max_length=20,
+        choices=GeneroConductor.choices,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    conductor_edad = models.PositiveSmallIntegerField(null=True, blank=True)
     codigo_postal = models.CharField(max_length=5, blank=True, default="", db_index=True)
     ciudad = models.CharField(max_length=100, blank=True, default="")
     estado = models.CharField(max_length=100, blank=True, default="")
@@ -215,3 +227,5 @@ class CotizacionFlotillaItemVehiculo(TimeStampedModel, MoneyMixin):
 
     class Meta:
         constraints = [UniqueConstraint(fields=["item", "vehiculo"], name="uq_item_vehiculo_flotilla")]
+
+    

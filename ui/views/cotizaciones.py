@@ -198,29 +198,6 @@ def cotizacion_select_item(request, pk: int, item_id: int):
     return redirect("ui:cotizacion_detail", pk=cot.pk)
 
 
-
-@login_required
-@permission_required("cotizador.change_cotizacionitem", raise_exception=True)
-def cotizacion_select_item2(request, pk: int, item_id: int):
-    """
-    Marca un item como seleccionado y desmarca los demás.
-    """
-    cotizacion = get_object_or_404(Cotizacion, pk=pk)
-
-    # Regla de cartera
-    is_admin = request.user.is_superuser or request.user.groups.filter(name="Admin").exists()
-    if not is_admin and cotizacion.owner_id != request.user.id:
-        return HttpResponseForbidden("No autorizado para modificar esta cotización.")
-
-    item = get_object_or_404(CotizacionItem, pk=item_id, cotizacion=cotizacion)
-
-    with transaction.atomic():
-        CotizacionItem.objects.filter(cotizacion=cotizacion, seleccionada=True).exclude(pk=item.pk).update(seleccionada=False)
-        CotizacionItem.objects.filter(pk=item.pk).update(seleccionada=True)
-
-    messages.success(request, f"Seleccionaste: {item.aseguradora.nombre} - {item.producto.nombre_producto}")
-    return redirect(reverse("ui:cotizacion_detail", kwargs={"pk": cotizacion.pk}))
-
 class CotizacionWizardClienteSelectView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """
     Wizard - Paso 1: buscar/seleccionar cliente.

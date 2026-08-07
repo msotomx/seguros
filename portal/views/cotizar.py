@@ -35,9 +35,6 @@ class PortalCotizarCreateView(View):
                 }
             )
 
-        if not form.is_valid():
-            return render(request, self.template_name, {"form": form})
-
         d = form.cleaned_data
 
         # ===== Cliente prospecto =====

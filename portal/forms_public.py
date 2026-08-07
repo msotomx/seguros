@@ -1,131 +1,239 @@
-from django import forms
-from crm.models import Cliente
-from cotizador.models import Cotizacion
+from datetime import date
 
 from django import forms
-from crm.models import Cliente
-from autos.models import Marca, SubMarca, VehiculoCatalogo, Vehiculo
-from datetime import date
+
+from autos.models import Marca, SubMarca, VehiculoCatalogo
+from cotizador.models import Cotizacion
+
 
 def anios_choices(desde=2000, hasta=None):
     if hasta is None:
         hasta = date.today().year + 2
-    return [(y, y) for y in range(hasta, desde - 1, -1)]
+
+    return [
+        (anio, anio)
+        for anio in range(hasta, desde - 1, -1)
+    ]
+
 
 class CotizacionPublicaForm(forms.Form):
-    # ===== Datos prospecto =====
-    tipo_cliente = forms.ChoiceField(
-        choices=Cliente.TipoCliente.choices,
-        widget=forms.Select(attrs={"class": "form-select"}),
+    # =====================================================
+    # Datos del prospecto/conductor
+    # =====================================================
+
+    nombre = forms.CharField(
+        required=True,
+        max_length=120,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Nombre",
+            }
+        ),
     )
+
+    genero = forms.ChoiceField(
+        required=True,
+        choices=Cotizacion.GeneroConductor.choices,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
+    )
+
+    edad = forms.IntegerField(
+        required=True,
+        min_value=18,
+        max_value=99,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "min": "18",
+                "max": "99",
+                "inputmode": "numeric",
+            }
+        ),
+    )
+
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "correo@ejemplo.com",
+            }
+        ),
+    )
+
+    telefono = forms.CharField(
+        required=True,
+        max_length=30,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Teléfono",
+                "inputmode": "tel",
+            }
+        ),
+    )
+
     codigo_postal = forms.CharField(
         required=True,
-        max_length=10,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "placeholder": "Ej. 32500"
-        })
+        min_length=5,
+        max_length=5,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Ej. 32500",
+                "maxlength": "5",
+                "inputmode": "numeric",
+            }
+        ),
     )
-    nombre = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    apellido_paterno = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    apellido_materno = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    nombre_comercial = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    email = forms.EmailField(widget=forms.EmailInput(attrs={"class": "form-control"}))
-    telefono = forms.CharField(widget=forms.TextInput(attrs={"class": "form-control"}))
 
-    # ===== Vehículo (catálogo) =====
-    tipo_uso = forms.ChoiceField(
-        choices=Vehiculo.TipoUso.choices,
-        initial=Vehiculo.TipoUso.PARTICULAR,
-        widget=forms.Select(attrs={"class": "form-select"}),
-    )
+    # =====================================================
+    # Vehículo
+    # =====================================================
 
     marca = forms.ModelChoiceField(
-        queryset=Marca.objects.filter(is_active=True).order_by("nombre"),
-        widget=forms.Select(attrs={"class": "form-select"}),
+        queryset=Marca.objects.filter(
+            is_active=True
+        ).order_by("nombre"),
         empty_label="Selecciona marca",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
     )
 
     submarca = forms.ModelChoiceField(
         queryset=SubMarca.objects.none(),
-        widget=forms.Select(attrs={"class": "form-select"}),
         empty_label="Selecciona submarca",
-        required=True,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
     )
+
     modelo_anio = forms.ChoiceField(
-        choices=[("", "Selecciona año")] + anios_choices(2000),
-        widget=forms.Select(attrs={"class": "form-select"}),
-        label="Año"
+        choices=[
+            ("", "Selecciona año"),
+            *anios_choices(2000),
+        ],
+        label="Modelo-Año",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
     )
 
     catalogo = forms.ModelChoiceField(
         queryset=VehiculoCatalogo.objects.none(),
-        widget=forms.Select(attrs={"class": "form-select"}),
         empty_label="Selecciona versión",
-        required=True,
+        label="Versión",
+        widget=forms.Select(
+            attrs={
+                "class": "form-select",
+            }
+        ),
     )
-
-    placas = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    vin = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-
-    notas = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}))
-
-    def clean(self):
-        data = super().clean()
-
-        #if data.get("tipo_cliente") == Cliente.TipoCliente.PERSONA:
-        #    if not data.get("nombre") or not data.get("apellido_paterno"):
-        #        raise forms.ValidationError("Para persona, nombre y apellido paterno son requeridos.")
-
-        if data.get("tipo_cliente") == Cliente.TipoCliente.EMPRESA:
-            if not data.get("nombre_comercial"):
-                raise forms.ValidationError("Para empresa, el nombre comercial es requerido.")
-
-        return data
-
-    vin = forms.CharField(
-        required=False,
-        max_length=17,
-        widget=forms.TextInput(attrs={
-            "class": "form-control",
-            "maxlength": "17",
-            "placeholder": "17 caracteres"
-        })
-    )
-
-    def clean_vin(self):
-        vin = (self.cleaned_data.get("vin") or "").strip().upper()
-
-        if vin and len(vin) != 17:
-            raise forms.ValidationError("El VIN debe tener exactamente 17 caracteres.")
-
-        return vin
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Si viene POST (self.data) recargamos los querysets para que validen
-        data = self.data or None
+        marca_id = self.data.get("marca") if self.is_bound else None
+        submarca_id = (
+            self.data.get("submarca")
+            if self.is_bound
+            else None
+        )
+        anio = (
+            self.data.get("modelo_anio")
+            if self.is_bound
+            else None
+        )
 
-        # 1) Submarcas por marca
-        marca_id = data.get("marca") if data else None
         if marca_id:
-            self.fields["submarca"].queryset = SubMarca.objects.filter(
-                marca_id=marca_id, is_active=True
-            ).order_by("nombre")
-        else:
-            self.fields["submarca"].queryset = SubMarca.objects.none()
-
-        # 2) VehiculoCatalogo por marca + submarca + anio
-        submarca_id = data.get("submarca") if data else None
-        anio = data.get("modelo_anio") if data else None
+            self.fields["submarca"].queryset = (
+                SubMarca.objects.filter(
+                    marca_id=marca_id,
+                    is_active=True,
+                ).order_by("nombre")
+            )
 
         if marca_id and submarca_id and anio:
-            self.fields["catalogo"].queryset = VehiculoCatalogo.objects.filter(
-                marca_id=marca_id,
-                submarca_id=submarca_id,
-                anio=anio,
-                is_active=True,
-            ).order_by("version")
-        else:
-            self.fields["catalogo"].queryset = VehiculoCatalogo.objects.none()
+            self.fields["catalogo"].queryset = (
+                VehiculoCatalogo.objects.filter(
+                    marca_id=marca_id,
+                    submarca_id=submarca_id,
+                    anio=anio,
+                    is_active=True,
+                ).order_by("version")
+            )
+
+    def clean_codigo_postal(self):
+        codigo_postal = (
+            self.cleaned_data["codigo_postal"]
+            .strip()
+        )
+
+        if not codigo_postal.isdigit():
+            raise forms.ValidationError(
+                "El código postal debe contener cinco dígitos."
+            )
+
+        return codigo_postal
+
+    def clean_telefono(self):
+        telefono = (
+            self.cleaned_data["telefono"]
+            .strip()
+        )
+
+        if not telefono:
+            raise forms.ValidationError(
+                "El teléfono es obligatorio."
+            )
+
+        return telefono
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        marca = cleaned_data.get("marca")
+        submarca = cleaned_data.get("submarca")
+        catalogo = cleaned_data.get("catalogo")
+        modelo_anio = cleaned_data.get("modelo_anio")
+
+        if not catalogo:
+            return cleaned_data
+
+        if marca and catalogo.marca_id != marca.id:
+            self.add_error(
+                "catalogo",
+                "La versión no corresponde a la marca seleccionada.",
+            )
+
+        if (
+            submarca
+            and catalogo.submarca_id != submarca.id
+        ):
+            self.add_error(
+                "catalogo",
+                "La versión no corresponde a la submarca seleccionada.",
+            )
+
+        if (
+            modelo_anio
+            and str(catalogo.anio) != str(modelo_anio)
+        ):
+            self.add_error(
+                "catalogo",
+                "La versión no corresponde al año seleccionado.",
+            )
+
+        return cleaned_data
