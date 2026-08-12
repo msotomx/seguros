@@ -67,7 +67,7 @@ def _item_payload() -> dict:
 
 def _response_payload() -> dict:
     return {
-        "isSuccess": True,
+        "success": True,
         "messages": [],
         "responseData": {
             "quoteId": 2061062766,
@@ -332,7 +332,7 @@ class ChubbQuoteResponseMapperTests(SimpleTestCase):
 
     def test_create_quote_rejects_unsuccessful_response(self):
         payload = {
-            "isSuccess": False,
+            "success": False,
             "messages": [
                 {
                     "code": "CHUBB.ERROR",
@@ -350,7 +350,7 @@ class ChubbQuoteResponseMapperTests(SimpleTestCase):
 
     def test_create_quote_rejects_missing_response_data(self):
         payload = {
-            "isSuccess": True,
+            "success": True,
             "responseData":None,
             "messages": [],
         }
@@ -368,6 +368,175 @@ class ChubbQuoteResponseMapperTests(SimpleTestCase):
         ChubbQuoteResponseMapper.create_quote(payload)
 
         self.assertEqual(payload, original)
+
+    def test_get_quote_maps_real_response_structure(self):
+        payload = {
+            "messages": [],
+            "responseData": {
+                "quoteId": 2061090336,
+                "quoteVersionId": 2061333219,
+                "baseNetPremium": 16984.7275,
+                "baseNetPremiumWithoutDiscount": 16984.7275,
+                "surchargePercentage": 0.0,
+                "surchargeAmount": 0.0,
+                "feeAmount": 600.0,
+                "taxPercentage": 0.16,
+                "taxAmount": 2813.5564,
+                "totalPremiumAmount": 20398.2839,
+                "commissionPorcentage": 0.0,
+                "commissionAmount": 0.0,
+                "surchargeCommissionAmount": 0.0,
+                "items": [
+                    {
+                        "riskNumber": 1,
+                        "packages": [
+                            {
+                                "packageId": 1,
+                                "quoteVersionId": 2061333219,
+                                "riskId": 2061468037,
+                                "selected": True,
+                                "totalPremiumAmount": 20398.2839,
+                                "vehicle": {
+                                    "vehicleKey": "010101001001",
+                                },
+                                "coverages": [
+                                    {
+                                        "coverageId": 1,
+                                        "coverageName": (
+                                            "DAÑOS MATERIALES"
+                                        ),
+                                        "coverageCustomName": "",
+                                        "selected": True,
+                                        "insuranceAmount": 314358.0,
+                                        "deductibleValue": 7.0,
+                                        "totalPremiumAmount": 12141.546,
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        result = ChubbQuoteResponseMapper.get_quote(
+            payload
+        )
+
+        self.assertEqual(
+            result.quote_id,
+            2061090336,
+        )
+
+        self.assertEqual(
+            result.quote_version_id,
+            2061333219,
+        )
+
+        self.assertEqual(
+            result.base_net_premium,
+            16984.7275,
+        )
+
+        self.assertEqual(
+            result.fee_amount,
+            600.0,
+        )
+
+        self.assertEqual(
+            result.tax_amount,
+            2813.5564,
+        )
+
+        self.assertEqual(
+            result.total_premium_amount,
+            20398.2839,
+        )
+
+        self.assertEqual(
+            len(result.items),
+            1,
+        )
+
+        item = result.items[0]
+
+        self.assertEqual(
+            item.risk_id,
+            2061468037,
+        )
+
+        self.assertEqual(
+            item.risk_number,
+            1,
+        )
+
+        self.assertEqual(
+            item.vehicle_key,
+            "010101001001",
+        )
+
+        self.assertEqual(
+            len(item.packages),
+            1,
+        )
+
+        package = item.packages[0]
+
+        self.assertEqual(
+            package.package_id,
+            1,
+        )
+
+        self.assertTrue(
+            package.selected,
+        )
+
+        self.assertEqual(
+            package.total_premium,
+            20398.2839,
+        )
+
+        self.assertEqual(
+            len(package.coverages),
+            1,
+        )
+
+        coverage = package.coverages[0]
+
+        self.assertEqual(
+            coverage.coverage_id,
+            1,
+        )
+
+        self.assertEqual(
+            coverage.description,
+            "DAÑOS MATERIALES",
+        )
+
+        self.assertEqual(
+            coverage.insured_amount,
+            314358.0,
+        )
+
+        self.assertEqual(
+            coverage.deductible_value,
+            7.0,
+        )
+
+        self.assertEqual(
+            coverage.premium,
+            12141.546,
+        )
+
+        self.assertTrue(
+            coverage.selected,
+        )
+
+        self.assertEqual(
+            result.raw_response,
+            payload,
+        )
+
 
 def _driver_request() -> ChubbQuoteDriverRequest:
     return ChubbQuoteDriverRequest(

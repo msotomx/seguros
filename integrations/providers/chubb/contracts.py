@@ -209,3 +209,9 @@ class ChubbVehicleUse:
     service_description: str
     use_id: int
     use_description: str
+
+@dataclass(frozen=True, slots=True)
+class ChubbMunicipality:
+    municipality_id: int
+    name: str
+    description: str = ""

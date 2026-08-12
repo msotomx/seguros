@@ -24,9 +24,7 @@ class ChubbAuthClientTest(SimpleTestCase):
             resource_id="test-resource",
             api_version="1",
             timeout=20,
-            settings={
-                "IDENTITY": "AAD",
-            },
+            settings={},
         )
 
         self.configuration_service = Mock()
@@ -81,17 +79,12 @@ class ChubbAuthClientTest(SimpleTestCase):
 
         self.session.post.assert_called_once_with(
             self.configuration.token_url,
-            params={
-                "Identity": "AAD",
-            },
             headers={
-                "Content-Type": "application/json",
-                "App_ID": "test-app-id",
-                "App_Key": "test-app-key",
+                "App_id": "test-app-id",
+                "App_key": "test-app-key",
                 "Resource": "test-resource",
                 "apiVersion": "1",
             },
-            json={},
             timeout=20,
         )
 
@@ -131,3 +124,35 @@ class ChubbAuthClientTest(SimpleTestCase):
             ProviderConfigurationError
         ):
             self.client.get_token()
+
+    def test_get_token_no_requiere_identity(self):
+        self.configuration.settings = {}
+
+        response = Mock()
+        response.ok = True
+        response.status_code = 200
+        response.json.return_value = {
+            "token_type": "Bearer",
+            "expires_in": "3599",
+            "access_token": "test-access-token",
+        }
+
+        self.session.post.return_value = response
+
+        token = self.client.get_token()
+
+        self.assertEqual(
+            token.access_token,
+            "test-access-token",
+        )
+
+        self.session.post.assert_called_once_with(
+            self.configuration.token_url,
+            headers={
+                "App_id": "test-app-id",
+                "App_key": "test-app-key",
+                "Resource": "test-resource",
+                "apiVersion": "1",
+            },
+            timeout=20,
+        )

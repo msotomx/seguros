@@ -505,17 +505,115 @@ class ChubbQuoteResponseMapper:
     """
 
     @classmethod
+    def _get_quote_item(
+        cls,
+        payload: Any,
+        *,
+        index: int,
+    ) -> ChubbQuoteItemResult:
+        field_prefix = (
+            f"responseData.items[{index}]"
+        )
+
+        item = cls._require_mapping(
+            payload,
+            field_prefix,
+        )
+
+        packages_payload = cls._require_list(
+            item.get("packages"),
+            f"{field_prefix}.packages",
+        )
+
+        if not packages_payload:
+            raise ValueError(
+                f"{field_prefix}.packages "
+                "no puede estar vacío."
+            )
+
+        packages = tuple(
+            cls._response_package(
+                package,
+                item_index=index,
+                package_index=package_index,
+            )
+            for package_index, package in enumerate(
+                packages_payload
+            )
+        )
+
+        risk_ids = set()
+        vehicle_keys = set()
+
+        for package_index, package_payload in enumerate(
+            packages_payload
+        ):
+            package_prefix = (
+                f"{field_prefix}."
+                f"packages[{package_index}]"
+            )
+
+            package_data = cls._require_mapping(
+                package_payload,
+                package_prefix,
+            )
+
+            risk_ids.add(
+                cls._positive_int(
+                    package_data.get("riskId"),
+                    f"{package_prefix}.riskId",
+                )
+            )
+
+            vehicle = cls._require_mapping(
+                package_data.get("vehicle"),
+                f"{package_prefix}.vehicle",
+            )
+
+            vehicle_keys.add(
+                cls._non_empty_string(
+                    vehicle.get("vehicleKey"),
+                    (
+                        f"{package_prefix}."
+                        "vehicle.vehicleKey"
+                    ),
+                )
+            )
+
+        if len(risk_ids) != 1:
+            raise ValueError(
+                f"{field_prefix}.packages contiene "
+                "más de un riskId."
+            )
+
+        if len(vehicle_keys) != 1:
+            raise ValueError(
+                f"{field_prefix}.packages contiene "
+                "más de un vehicleKey."
+            )
+
+        return ChubbQuoteItemResult(
+            risk_id=next(iter(risk_ids)),
+            risk_number=cls._positive_int(
+                item.get("riskNumber"),
+                f"{field_prefix}.riskNumber",
+            ),
+            vehicle_key=next(iter(vehicle_keys)),
+            packages=packages,
+        )
+
+    @classmethod
     def create_quote(
         cls,
         payload: Mapping[str, Any],
     ) -> ChubbCreateQuoteResult:
         root = cls._require_mapping(payload, "response")
 
-        success = root.get("isSuccess")
+        success = root.get("success")
 
         if not isinstance(success, bool):
             raise ValueError(
-                "La respuesta de Chubb no contiene un isSuccess válido."
+                "La respuesta de Chubb no contiene un success válido."
             )
 
         if not success:
@@ -961,3 +1059,133 @@ class ChubbQuoteResponseMapper:
             )
 
         return value
+
+    @classmethod
+    def get_quote(
+        cls,
+        payload: Mapping[str, Any],
+    ) -> ChubbCreateQuoteResult:
+        root = cls._require_mapping(
+            payload,
+            "response",
+        )
+
+        response_data = cls._require_mapping(
+            root.get("responseData"),
+            "responseData",
+        )
+
+        items_payload = cls._require_list(
+            response_data.get("items"),
+            "responseData.items",
+        )
+
+        items = tuple(
+            cls._get_quote_item(
+                item,
+                index=index,
+            )
+            for index, item in enumerate(
+                items_payload
+            )
+        )
+
+        discounts_payload = (
+            response_data.get("discounts")
+            or []
+        )
+
+        discounts = tuple(
+            cls._response_discount(
+                discount,
+                index,
+            )
+            for index, discount in enumerate(
+                discounts_payload
+            )
+        )
+
+        return ChubbCreateQuoteResult(
+            quote_id=cls._positive_int(
+                response_data.get("quoteId"),
+                "responseData.quoteId",
+            ),
+            quote_version_id=cls._positive_int(
+                response_data.get("quoteVersionId"),
+                "responseData.quoteVersionId",
+            ),
+            base_net_premium=cls._number(
+                response_data.get("baseNetPremium"),
+                "responseData.baseNetPremium",
+            ),
+            base_net_premium_without_discount=cls._number(
+                response_data.get(
+                    "baseNetPremiumWithoutDiscount"
+                ),
+                (
+                    "responseData."
+                    "baseNetPremiumWithoutDiscount"
+                ),
+            ),
+            discounts=discounts,
+            surcharge_percentage=cls._nullable_number(
+                response_data.get(
+                    "surchargePercentage"
+                ),
+                "responseData.surchargePercentage",
+            ),
+            surcharge_amount=cls._number(
+                response_data.get(
+                    "surchargeAmount"
+                ),
+                "responseData.surchargeAmount",
+            ),
+            fee_amount=cls._number(
+                response_data.get("feeAmount"),
+                "responseData.feeAmount",
+            ),
+            tax_percentage=cls._nullable_number(
+                response_data.get("taxPercentage"),
+                "responseData.taxPercentage",
+            ),
+            tax_amount=cls._number(
+                response_data.get("taxAmount"),
+                "responseData.taxAmount",
+            ),
+            total_premium_amount=cls._number(
+                response_data.get(
+                    "totalPremiumAmount"
+                ),
+                "responseData.totalPremiumAmount",
+            ),
+            commission_percentage=(
+                cls._nullable_number(
+                    response_data.get(
+                        "commissionPorcentage"
+                    ),
+                    (
+                        "responseData."
+                        "commissionPorcentage"
+                    ),
+                )
+            ),
+            commission_amount=cls._nullable_number(
+                response_data.get(
+                    "commissionAmount"
+                ),
+                "responseData.commissionAmount",
+            ),
+            surcharge_commission_amount=(
+                cls._nullable_number(
+                    response_data.get(
+                        "surchargeCommissionAmount"
+                    ),
+                    (
+                        "responseData."
+                        "surchargeCommissionAmount"
+                    ),
+                )
+            ),
+            items=items,
+            raw_response=root,
+        )

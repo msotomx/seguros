@@ -483,3 +483,95 @@ class ChubbQuoteClientTests(SimpleTestCase):
             ambiente="SIT",
             ramo="AUTOS",
         )
+
+    def test_get_quote_executes_get_and_maps_response(self):
+        response_payload = {
+            "messages": [],
+            "responseData": {
+                "quoteId": 2061090336,
+                "quoteVersionId": 2061333219,
+                "baseNetPremium": 16984.7275,
+                "baseNetPremiumWithoutDiscount": 16984.7275,
+                "surchargePercentage": 0.0,
+                "surchargeAmount": 0.0,
+                "feeAmount": 600.0,
+                "taxPercentage": 0.16,
+                "taxAmount": 2813.5564,
+                "totalPremiumAmount": 20398.2839,
+                "commissionPorcentage": 0.0,
+                "commissionAmount": 0.0,
+                "surchargeCommissionAmount": 0.0,
+                "items": [
+                    {
+                        "riskNumber": 1,
+                        "packages": [
+                            {
+                                "packageId": 1,
+                                "riskId": 2061468037,
+                                "selected": True,
+                                "totalPremiumAmount": 20398.2839,
+                                "vehicle": {
+                                    "vehicleKey": "010101001001",
+                                },
+                                "coverages": [],
+                            },
+                        ],
+                    },
+                ],
+            },
+        }
+
+        self.http_client.get.return_value = ChubbHttpResponse(
+            status_code=200,
+            data=response_payload,
+            headers={},
+        )
+
+        expected_result = Mock(
+            spec=ChubbCreateQuoteResult,
+        )
+
+        with patch(
+            "integrations.providers.chubb.quote_client."
+            "ChubbQuoteResponseMapper.get_quote"
+        ) as mapper_mock:
+            mapper_mock.return_value = expected_result
+
+            result = self.client.get_quote(
+                2061090336
+            )
+
+        self.auth_client.get_token.assert_called_once_with()
+
+        self.http_client.get.assert_called_once_with(
+            "/quote",
+            token=self.token,
+            params={
+                "quoteId": 2061090336,
+            },
+        )
+
+        mapper_mock.assert_called_once_with(
+            response_payload
+        )
+
+        self.assertIs(
+            result,
+            expected_result,
+        )
+
+    def test_get_quote_rejects_invalid_quote_id(self):
+        invalid_values = (
+            0,
+            -1,
+            True,
+            None,
+            "2061090336",
+        )
+
+        for value in invalid_values:
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    self.client.get_quote(
+                        value
+                    )

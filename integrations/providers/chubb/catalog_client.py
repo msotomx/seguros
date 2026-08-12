@@ -28,6 +28,8 @@ from integrations.providers.chubb.contracts import (
     ChubbVehicleYear,
     ChubbVehicleData,
     ChubbVehicleUse,
+    ChubbCountrySubdivision,
+    ChubbMunicipality,
 )
 from integrations.providers.exceptions import (
     ProviderConfigurationError,
@@ -785,3 +787,86 @@ class ChubbCatalogClient:
         )
 
         return ChubbCatalogMapper.vehicle_uses(payload)
+
+    def country_subdivisions(
+        self,
+        *,
+        business_profile_name: str,
+        grouping_id: int,
+        rate_id: int,
+    ) -> tuple[ChubbCountrySubdivision, ...]:
+
+        business_profile_name = self._required_text(
+            business_profile_name,
+            field_name="BusinessProfileName",
+        )
+
+        grouping_id = self._required_positive_int(
+            grouping_id,
+            field_name="GroupingId",
+        )
+
+        rate_id = self._required_positive_int(
+            rate_id,
+            field_name="RateId",
+        )
+
+        payload = self._get_catalog(
+            "/catalogs/locations/countrySubdivisions",
+            params={
+                "BusinessProfileName": business_profile_name,
+                "GroupingId": grouping_id,
+                "RateId": rate_id,
+            },
+        )
+
+        return ChubbCatalogMapper.map_country_subdivisions(
+            payload
+        )
+
+    def municipalities(
+        self,
+        *,
+        country_subdivision_id: int,
+        business_profile_name: str,
+        grouping_id: int,
+        rate_id: int,
+    ) -> tuple[ChubbMunicipality, ...]:
+
+        country_subdivision_id = self._required_positive_int(
+            country_subdivision_id,
+            field_name="CountrySubdivisionId",
+        )
+
+        business_profile_name = self._required_text(
+            business_profile_name,
+            field_name="BusinessProfileName",
+        )
+
+        grouping_id = self._required_positive_int(
+            grouping_id,
+            field_name="GroupingId",
+        )
+
+        rate_id = self._required_positive_int(
+            rate_id,
+            field_name="RateId",
+        )
+
+        payload = self._get_catalog(
+            "/catalogs/locations/municipalities",
+            params={
+                "CountrySubdivisionId": (
+                    country_subdivision_id
+                ),
+                "GroupingId": grouping_id,
+                "RateId": rate_id,
+                "BusinessProfileName": (
+                    business_profile_name
+                ),
+            },
+        )
+
+        return ChubbCatalogMapper.map_municipalities(
+            payload
+        )

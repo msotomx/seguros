@@ -49,20 +49,9 @@ class ChubbAuthClient:
 
         self._validate_configuration(configuration)
 
-        identity = str(
-            configuration.settings.get("IDENTITY", "")
-        ).strip()
-
-        if not identity:
-            raise ProviderAuthenticationError(
-                "Chubb no tiene configurado el parámetro obligatorio "
-                "'IDENTITY'."
-            )
-
         headers = {
-            "Content-Type": "application/json",
-            "App_ID": str(configuration.client_id).strip(),
-            "App_Key": str(configuration.client_secret).strip(),
+            "App_id": str(configuration.client_id).strip(),
+            "App_key": str(configuration.client_secret).strip(),
             "Resource": str(configuration.resource_id).strip(),
             "apiVersion": str(configuration.api_version).strip(),
         }
@@ -70,13 +59,10 @@ class ChubbAuthClient:
         try:
             response = self.session.post(
                 configuration.token_url,
-                params={
-                    "Identity": identity,
-                },
                 headers=headers,
-                json={},
                 timeout=configuration.timeout,
             )
+
         except requests.Timeout as exc:
             raise ProviderAuthenticationError(
                 "Chubb no respondió dentro del tiempo configurado."

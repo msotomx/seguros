@@ -103,6 +103,38 @@ class ChubbQuoteClient:
 
         return response.data
 
+    def get_quote(
+        self,
+        quote_id: int,
+    ) -> ChubbCreateQuoteResult:
+        if (
+            not isinstance(quote_id, int)
+            or isinstance(quote_id, bool)
+            or quote_id <= 0
+        ):
+            raise ValueError(
+                "quote_id debe ser un entero mayor que cero."
+            )
+
+        token = self.auth_client.get_token()
+
+        response = self.http_client.get(
+            "/quote",
+            token=token,
+            params={
+                "quoteId": quote_id,
+            },
+        )
+
+        try:
+            return ChubbQuoteResponseMapper.get_quote(
+                response.data
+            )
+        except ValueError as exc:
+            raise ProviderInvalidResponseError(
+                str(exc)
+            ) from exc
+
     def create_quote(
         self,
         request: ChubbCreateQuoteRequest,

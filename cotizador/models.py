@@ -137,7 +137,13 @@ class CotizacionItem(TimeStampedModel, MoneyMixin):
     cotizacion = models.ForeignKey(Cotizacion, on_delete=models.CASCADE, related_name="items")
     aseguradora = models.ForeignKey(Aseguradora, on_delete=models.PROTECT, related_name="cotizacion_items")
     producto = models.ForeignKey(ProductoSeguro, on_delete=models.PROTECT, related_name="cotizacion_items")
-
+    provider_option = models.OneToOneField(
+        "cotizador.CotizacionProveedorOpcion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cotizacion_item",
+    )
     # resultados (para A y/o B)
     prima_neta = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     derechos = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -164,9 +170,6 @@ class CotizacionItem(TimeStampedModel, MoneyMixin):
     paquete_nombre = models.CharField(max_length=120, blank=True, default="")
 
     class Meta:
-        constraints = [
-            UniqueConstraint(fields=["cotizacion", "aseguradora", "producto"], name="uq_cotizacion_item_unico"),
-        ]
         indexes = [
             models.Index(fields=["cotizacion", "ranking"]),
             models.Index(fields=["aseguradora", "producto"]),
@@ -228,4 +231,300 @@ class CotizacionFlotillaItemVehiculo(TimeStampedModel, MoneyMixin):
     class Meta:
         constraints = [UniqueConstraint(fields=["item", "vehiculo"], name="uq_item_vehiculo_flotilla")]
 
-    
+# ---------------------------------------------------------------------
+# Resultados de proveedores externos, Chubb, Axa, etc
+# ---------------------------------------------------------------------
+
+class CotizacionProveedor(TimeStampedModel):
+    """
+    Representa una ejecución de cotización contra un proveedor externo.
+
+    Se conserva un registro por intento para mantener trazabilidad,
+    incluyendo ejecuciones exitosas y fallidas.
+    """
+
+    cotizacion = models.ForeignKey(
+        Cotizacion,
+        on_delete=models.CASCADE,
+        related_name="resultados_proveedor",
+    )
+
+    provider_code = models.CharField(
+        max_length=30,
+        db_index=True,
+    )
+
+    success = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
+    elapsed_ms = models.PositiveIntegerField(
+        default=0,
+    )
+
+    # Identificadores externos
+    provider_quote_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_quote_version_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    reference = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    currency = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+    )
+
+    # Importes.
+    # Son nullable porque un intento fallido no tiene resultado económico.
+    net_premium = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    fees = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    taxes = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    total_premium = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    # Trazabilidad
+    request_json = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    response_json = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    messages_json = models.JSONField(
+        default=list,
+        blank=True,
+    )
+
+    # Error normalizado del QuoteAttempt
+    error_message = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    error_type = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    error_retryable = models.BooleanField(
+        default=False,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["cotizacion", "provider_code", "created_at"]
+            ),
+            models.Index(
+                fields=["provider_code", "success"]
+            ),
+        ]
+
+
+class CotizacionProveedorRiesgo(TimeStampedModel):
+    """
+    Riesgo normalizado devuelto por un proveedor.
+    Corresponde a QuoteRiskResult.
+    """
+
+    cotizacion_proveedor = models.ForeignKey(
+        CotizacionProveedor,
+        on_delete=models.CASCADE,
+        related_name="riesgos",
+    )
+
+    reference = models.CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    provider_risk_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    risk_number = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+    )
+
+    vehicle_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["cotizacion_proveedor", "provider_risk_id"]
+            ),
+        ]
+
+
+class CotizacionProveedorOpcion(TimeStampedModel):
+    """
+    Opción o paquete comercial normalizado.
+    Corresponde a QuoteOption.
+    """
+
+    cotizacion_proveedor = models.ForeignKey(
+        CotizacionProveedor,
+        on_delete=models.CASCADE,
+        related_name="opciones",
+    )
+
+    riesgo = models.ForeignKey(
+        CotizacionProveedorRiesgo,
+        on_delete=models.CASCADE,
+        related_name="opciones",
+        null=True,
+        blank=True,
+    )
+
+    code = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    # Se almacena como texto para no imponer que todos los
+    # proveedores utilicen identificadores numéricos.
+    provider_package_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    name = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+    )
+
+    total_premium = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+        db_index=True,
+    )
+
+    currency = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+    )
+
+    selected = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["cotizacion_proveedor", "selected"]
+            ),
+            models.Index(
+                fields=["riesgo", "provider_package_id"]
+            ),
+        ]
+
+
+class CotizacionProveedorCobertura(TimeStampedModel):
+    """
+    Cobertura normalizada devuelta por el proveedor.
+    Corresponde a QuoteCoverage.
+    """
+
+    opcion = models.ForeignKey(
+        CotizacionProveedorOpcion,
+        on_delete=models.CASCADE,
+        related_name="coberturas",
+    )
+
+    code = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    name = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+    )
+
+    insured_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    deductible = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    premium = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=["opcion", "code"]
+            ),
+        ]

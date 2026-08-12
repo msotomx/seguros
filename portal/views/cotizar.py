@@ -1,19 +1,19 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views import View
 
-from crm.models import Cliente
-from crm.models import CodigoPostal
-from cotizador.models import Cotizacion
 from autos.models import Vehiculo
+from cotizador.models import (
+    Cotizacion,
+    CotizacionItem,
+    CotizacionItemCalculo,
+)
+from crm.models import Cliente, CodigoPostal
 from portal.forms_public import CotizacionPublicaForm
-
-from datetime import timedelta
-from django.contrib import messages
-from django.utils import timezone
-
 from tarifas.services.rating_engine import RatingEngine
-from cotizador.models import CotizacionItem, CotizacionItemCalculo 
 
 
 class PortalCotizarCreateView(View):
@@ -32,12 +32,15 @@ class PortalCotizarCreateView(View):
                 {
                     "form": form,
                     "show_step_2": True,
-                }
+                },
             )
 
         d = form.cleaned_data
 
-        # ===== Cliente prospecto =====
+        # =====================================================
+        # Cliente prospecto
+        # =====================================================
+
         cliente = (
             Cliente.objects
             .filter(email_principal=d["email"])
@@ -47,15 +50,29 @@ class PortalCotizarCreateView(View):
 
         if not cliente:
             cliente = Cliente.objects.create(
+                tipo_cliente=Cliente.TipoCliente.PERSONA,
+                nombre=d["nombre"],
                 email_principal=d["email"],
-                tipo_cliente=d["tipo_cliente"],
                 telefono_principal=d["telefono"],
                 estatus=Cliente.Estatus.PROSPECTO,
-                origen="PORTAL_PUBLICO",
+                origen=Cotizacion.Origen.PORTAL_PUBLICO,
                 codigo_postal=d["codigo_postal"],
             )
+
+        # Actualizamos los datos de contacto capturados.
+        cliente.nombre = d["nombre"]
+        cliente.email_principal = d["email"]
+        cliente.telefono_principal = d["telefono"]
+        cliente.tipo_cliente = Cliente.TipoCliente.PERSONA
         cliente.codigo_postal = d["codigo_postal"]
-        cp = CodigoPostal.objects.filter(codigo_postal=d["codigo_postal"]).first()
+
+        cp = (
+            CodigoPostal.objects
+            .filter(
+                codigo_postal=d["codigo_postal"]
+            )
+            .first()
+        )
 
         if cp:
             cliente.ciudad = cp.ciudad
@@ -64,55 +81,76 @@ class PortalCotizarCreateView(View):
             cliente.ciudad = ""
             cliente.estado = ""
 
-        cliente.telefono_principal = d["telefono"]
-        cliente.tipo_cliente = d["tipo_cliente"]
-        if cliente.tipo_cliente == Cliente.TipoCliente.PERSONA:
-            cliente.nombre = d.get("nombre", "") or cliente.nombre
-            cliente.apellido_paterno = d.get("apellido_paterno", "") or cliente.apellido_paterno
-            cliente.apellido_materno = d.get("apellido_materno", "") or cliente.apellido_materno
-        else:
-            cliente.nombre_comercial = d.get("nombre_comercial", "") or cliente.nombre_comercial
-        cliente.codigo_postal = d["codigo_postal"]
         cliente.save()
 
-        # ===== Vehículo desde catálogo =====
-        vc = d["catalogo"]  # VehiculoCatalogo seleccionado
+        # =====================================================
+        # Vehículo
+        # =====================================================
+
+        catalogo = d["catalogo"]
 
         vehiculo = Vehiculo.objects.create(
             cliente=cliente,
-            catalogo=vc,
-            tipo_uso=d["tipo_uso"],
-            marca_texto=vc.marca.nombre,
-            submarca_texto=vc.submarca.nombre,
-            modelo_anio=vc.anio,
-            version=vc.version or "",
-            tipo_vehiculo=vc.tipo_vehiculo or "",
-            valor_comercial=vc.valor_referencia,  # si quieres usarlo
-            placas=d.get("placas", ""),
-            vin = (d.get("vin") or "").strip().upper(),
+            catalogo=catalogo,
+
+            # El modelo tiene PARTICULAR como default.
+            # Lo indicamos explícitamente porque es una regla
+            # del flujo público actual.
+            tipo_uso=Vehiculo.TipoUso.PARTICULAR,
+
+            marca_texto=catalogo.marca.nombre,
+            submarca_texto=catalogo.submarca.nombre,
+            modelo_anio=catalogo.anio,
+            version=catalogo.version or "",
+            tipo_vehiculo=catalogo.tipo_vehiculo or "",
+            valor_comercial=catalogo.valor_referencia,
         )
 
-        # ===== Vigencia automática =====
+        # =====================================================
+        # Vigencia
+        # =====================================================
+
         hoy = timezone.localdate()
+
         vigencia_desde = hoy
         vigencia_hasta = hoy + timedelta(days=365)
 
-        # ===== Cotización =====
+        # =====================================================
+        # Cotización
+        # =====================================================
+
         cot = Cotizacion.objects.create(
             cliente=cliente,
-            codigo_postal=d.get("codigo_postal", ""),
             vehiculo=vehiculo,
             flotilla=None,
+
             tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+
             vigencia_desde=vigencia_desde,
             vigencia_hasta=vigencia_hasta,
-            notas=d.get("notas", ""),
+
             estatus=Cotizacion.Estatus.BORRADOR,
             origen=Cotizacion.Origen.PORTAL_PUBLICO,
-            ciudad = Cliente.ciudad,
-            estado = Cliente.estado,
+
+            codigo_postal=d["codigo_postal"],
+            ciudad=cliente.ciudad,
+            estado=cliente.estado,
+
+            conductor_nombre=d["nombre"],
+            conductor_genero=d["genero"],
+            conductor_edad=d["edad"],
         )
+
+        # =====================================================
+        # Motor actual de tarifas
+        #
+        # Por ahora lo conservamos.
+        # En el siguiente paso será reemplazado/encapsulado
+        # por el nuevo QuoteService.
+        # =====================================================
+
         engine = RatingEngine()
+
         results = engine.quote(cot)
 
         for r in results:
@@ -141,9 +179,19 @@ class PortalCotizarCreateView(View):
                 detalle_json=r.detalle_json or {},
             )
 
+        # =====================================================
+        # Sesión pública
+        # =====================================================
+
         request.session["cotizacion_publica_id"] = cot.id
-        messages.success(request, "¡Listo! Aquí está el resumen de tu solicitud.")
+
+        messages.success(
+            request,
+            "¡Listo! Aquí está el resumen de tu solicitud.",
+        )
+
         return redirect("portal:cotizar_resumen")
+
 
 from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import DetailView, View

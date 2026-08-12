@@ -18,10 +18,13 @@ from integrations.providers.chubb.contracts import (
     ChubbVehicleYear,
     ChubbVehicleData,
     ChubbVehicleUse,
+    ChubbCountrySubdivision,
+    ChubbMunicipality,
 )
 from integrations.providers.exceptions import (
     ProviderInvalidResponseError,
 )
+
 
 class ChubbCatalogMapper:
     """
@@ -1413,6 +1416,101 @@ class ChubbCatalogMapper:
                     ),
                     use_id=use_id,
                     use_description=use_description,
+                )
+            )
+
+        return tuple(results)
+
+    @classmethod
+    def map_country_subdivisions(
+        cls,
+        payload: Any,
+    ) -> tuple[ChubbCountrySubdivision, ...]:
+        if not isinstance(payload, Mapping):
+            raise ProviderInvalidResponseError(
+                "La respuesta de Country Subdivisions "
+                "debe ser un objeto JSON."
+            )
+
+        items = payload.get("countrySubdivisions")
+
+        if not isinstance(items, list):
+            raise ProviderInvalidResponseError(
+                "El campo 'countrySubdivisions' "
+                "debe ser una lista."
+            )
+
+        results: list[ChubbCountrySubdivision] = []
+
+        for index, item in enumerate(items):
+            if not isinstance(item, Mapping):
+                raise ProviderInvalidResponseError(
+                    f"El elemento countrySubdivisions[{index}] "
+                    "debe ser un objeto JSON."
+                )
+
+            subdivision_id = cls._required_positive_int(
+                item.get("countrySubdivisionId"),
+                field_name="countrySubdivisionId",
+            )
+
+            description = cls._required_text(
+                item.get("countrySubdivisionDescription"),
+                field_name="countrySubdivisionDescription",
+            )
+
+            results.append(
+                ChubbCountrySubdivision(
+                    subdivision_id=subdivision_id,
+                    name=description,
+                    description=description,
+                )
+            )
+
+        return tuple(results)
+
+    @classmethod
+    def map_municipalities(
+        cls,
+        payload: Any,
+    ) -> tuple[ChubbMunicipality, ...]:
+        if not isinstance(payload, Mapping):
+            raise ProviderInvalidResponseError(
+                "La respuesta de Municipalities debe ser "
+                "un objeto JSON."
+            )
+
+        items = payload.get("municipalities")
+
+        if not isinstance(items, list):
+            raise ProviderInvalidResponseError(
+                "El campo 'municipalities' debe ser una lista."
+            )
+
+        results: list[ChubbMunicipality] = []
+
+        for index, item in enumerate(items):
+            if not isinstance(item, Mapping):
+                raise ProviderInvalidResponseError(
+                    f"El elemento municipalities[{index}] "
+                    "debe ser un objeto JSON."
+                )
+
+            municipality_id = cls._required_positive_int(
+                item.get("municipalityId"),
+                field_name="municipalityId",
+            )
+
+            description = cls._required_text(
+                item.get("municipalityDescription"),
+                field_name="municipalityDescription",
+            )
+
+            results.append(
+                ChubbMunicipality(
+                    municipality_id=municipality_id,
+                    name=description,
+                    description=description,
                 )
             )
 
