@@ -12,6 +12,8 @@ from integrations.quotes.contracts import (
     QuoteRisk,
     QuoteVehicle,
 )
+from crm.models import CodigoPostal
+
 
 class QuoteRequestService:
     """
@@ -47,6 +49,12 @@ class QuoteRequestService:
 
         vehiculo = cotizacion.vehiculo
 
+        municipality_internal_code = (
+            cls._municipality_internal_code(
+                cotizacion=cotizacion,
+            )
+        )
+
         vehicle_mapping = catalog_service.to_provider(
             provider_id=provider_id,
             catalog_code=cls.VEHICLE_CATALOG_CODE,
@@ -70,7 +78,7 @@ class QuoteRequestService:
         municipality_mapping = catalog_service.to_provider(
             provider_id=provider_id,
             catalog_code=cls.MUNICIPALITY_CATALOG_CODE,
-            internal_code=cotizacion.ciudad,
+            internal_code=municipality_internal_code,
         )
 
         package_mapping = catalog_service.to_provider(
@@ -123,6 +131,50 @@ class QuoteRequestService:
         return (
             f"VEHICULO_CATALOGO_{vehiculo_catalogo_id}"
         )
+
+    @staticmethod
+    def _municipality_internal_code(
+        *,
+        cotizacion: Cotizacion,
+    ) -> str:
+        codigo_postal = (
+            cotizacion.codigo_postal or ""
+        ).strip()
+
+        if not codigo_postal:
+            raise ValueError(
+                "La cotización no contiene código postal."
+            )
+
+        municipios = {
+            municipio.strip().upper()
+            for municipio in (
+                CodigoPostal.objects
+                .filter(
+                    codigo_postal=codigo_postal,
+                )
+                .values_list(
+                    "municipio",
+                    flat=True,
+                )
+            )
+            if municipio and municipio.strip()
+        }
+
+        if not municipios:
+            raise ValueError(
+                "No existe un municipio configurado "
+                f"para el código postal {codigo_postal}."
+            )
+
+        if len(municipios) > 1:
+            raise ValueError(
+                "El código postal "
+                f"{codigo_postal} tiene más de un municipio "
+                "configurado."
+            )
+
+        return municipios.pop()
 
     @staticmethod
     def _validate(
@@ -185,9 +237,9 @@ class QuoteRequestService:
                 "La cotización no contiene estado."
             )
 
-        if not cotizacion.ciudad.strip():
+        if not (cotizacion.codigo_postal or "").strip():
             raise ValueError(
-                "La cotización no contiene ciudad/municipio."
+                "La cotización no contiene código postal."
             )
 
         if not cotizacion.cliente.nombre_mostrar.strip():

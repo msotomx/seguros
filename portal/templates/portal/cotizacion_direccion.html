@@ -1,0 +1,144 @@
+{% extends "portal/base.html" %}
+
+{% block title %}
+Dirección del cliente
+{% endblock %}
+
+{% block content %}
+
+<div class="py-4">
+
+  <div class="row justify-content-center">
+
+    <div class="col-lg-8 col-xl-7">
+
+      <div class="text-center mb-4">
+        <span class="badge text-bg-primary mb-2">
+          Paso 4
+        </span>
+
+        <h1 class="fw-bold mb-2">
+          Confirma tu dirección
+        </h1>
+
+        <p class="text-muted mb-0">
+          Verifica la ubicación y completa
+          los datos de tu domicilio.
+        </p>
+      </div>
+
+      <div class="card shadow-sm border-0">
+
+        <div class="card-body p-4 p-lg-5">
+
+          <!-- Datos conocidos -->
+
+          <div class="row g-3 mb-4">
+
+            <div class="col-md-4">
+              <div class="text-muted small">
+                Código postal
+              </div>
+              <div class="fw-semibold">
+                {{ cotizacion.codigo_postal }}
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-muted small">
+                Ciudad
+              </div>
+              <div class="fw-semibold">
+                {{ cotizacion.ciudad }}
+              </div>
+            </div>
+
+            <div class="col-md-4">
+              <div class="text-muted small">
+                Estado
+              </div>
+              <div class="fw-semibold">
+                {{ cotizacion.estado }}
+              </div>
+            </div>
+
+          </div>
+
+          <hr class="mb-4">
+
+          <form method="post">
+            {% csrf_token %}
+
+            {% if form.errors %}
+              <div class="alert alert-danger">
+                <strong>
+                  Revisa la información capturada.
+                </strong>
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+
+              <div class="col-md-8">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.calle.id_for_label }}"
+                >
+                  Calle *
+                </label>
+
+                {{ form.calle }}
+                {{ form.calle.errors }}
+              </div>
+
+              <div class="col-md-4">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.num_ext.id_for_label }}"
+                >
+                  Número *
+                </label>
+
+                {{ form.num_ext }}
+                {{ form.num_ext.errors }}
+              </div>
+
+              <div class="col-12">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.colonia.id_for_label }}"
+                >
+                  Colonia *
+                </label>
+
+                {{ form.colonia }}
+                {{ form.colonia.errors }}
+              </div>
+
+              <div class="col-12 mt-4">
+
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-lg w-100"
+                >
+                  Siguiente
+                  <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+
+              </div>
+
+            </div>
+
+          </form>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

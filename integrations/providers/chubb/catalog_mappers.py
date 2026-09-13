@@ -20,6 +20,7 @@ from integrations.providers.chubb.contracts import (
     ChubbVehicleUse,
     ChubbCountrySubdivision,
     ChubbMunicipality,
+    ChubbSuburb,    
 )
 from integrations.providers.exceptions import (
     ProviderInvalidResponseError,
@@ -1244,6 +1245,20 @@ class ChubbCatalogMapper:
 
                 return value
 
+            def optional_text(field_name: str) -> str:
+                value = item.get(field_name)
+
+                if value is None:
+                    return ""
+
+                if not isinstance(value, str):
+                    raise ValueError(
+                        f"vehicles[{index}].{field_name} "
+                        "debe ser texto o null."
+                    )
+
+                return value.strip()
+
             tonnage = item.get("tonnage")
 
             if (
@@ -1294,7 +1309,7 @@ class ChubbCatalogMapper:
                     status=required_int("status"),
                     make_id=required_int("makeId"),
                     submake_id=required_int("subMakeId"),
-                    vehicle_type_description=required_text(
+                    vehicle_type_description=optional_text(
                         "vehicleTypeDescription"
                     ),
                     trailer_type_description=required_text(
@@ -1319,7 +1334,7 @@ class ChubbCatalogMapper:
                     status_description=required_text(
                         "statusDescription"
                     ),
-                    mtc=required_text("mtc"),
+                    mtc=optional_text("mtc"),
                     vehicle_key=required_text("vehicleKey"),
                     vehicle_condition_id=required_int(
                         "vehicleConditionId",
@@ -1511,6 +1526,78 @@ class ChubbCatalogMapper:
                     municipality_id=municipality_id,
                     name=description,
                     description=description,
+                )
+            )
+
+        return tuple(results)
+
+    @classmethod
+    def map_suburbs(
+        cls,
+        payload: Any,
+    ) -> tuple[ChubbSuburb, ...]:
+        if not isinstance(payload, Mapping):
+            raise ProviderInvalidResponseError(
+                "La respuesta de Suburbs debe ser "
+                "un objeto JSON."
+            )
+
+        items = payload.get("suburbs")
+
+        if not isinstance(items, list):
+            raise ProviderInvalidResponseError(
+                "El campo 'suburbs' debe ser una lista."
+            )
+
+        results: list[ChubbSuburb] = []
+
+        for index, item in enumerate(items):
+            if not isinstance(item, Mapping):
+                raise ProviderInvalidResponseError(
+                    f"El elemento suburbs[{index}] "
+                    "debe ser un objeto JSON."
+                )
+
+            suburb_id = cls._required_positive_int(
+                item.get("suburbId"),
+                field_name="suburbId",
+            )
+
+            description = cls._required_text(
+                item.get("suburbDescription"),
+                field_name="suburbDescription",
+            )
+
+            country_subdivision_id = item.get(
+                "countrySubdivisionId"
+            )
+            municipality_id = item.get(
+                "municipalityId"
+            )
+            population_id = item.get(
+                "populationId"
+            )
+
+            results.append(
+                ChubbSuburb(
+                    suburb_id=suburb_id,
+                    name=description,
+                    description=description,
+                    country_subdivision_id=(
+                        int(country_subdivision_id)
+                        if country_subdivision_id is not None
+                        else None
+                    ),
+                    municipality_id=(
+                        int(municipality_id)
+                        if municipality_id is not None
+                        else None
+                    ),
+                    population_id=(
+                        int(population_id)
+                        if population_id is not None
+                        else None
+                    ),
                 )
             )
 

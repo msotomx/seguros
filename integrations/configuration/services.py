@@ -55,37 +55,8 @@ class ProviderConfigurationService:
                 f"provider={provider}, ambiente={ambiente}, ramo={ramo}."
             )
 
-        settings = cls._build_settings(config_model)
-
-        return ProviderConfiguration(
-            id=config_model.id,
-            provider=config_model.provider,
-            ambiente=config_model.ambiente,
-            ramo=config_model.ramo,
-            nombre=config_model.nombre,
-            aseguradora_id=config_model.aseguradora_id,
-            activo=config_model.activo,
-            prioridad=config_model.prioridad,
-            token_url=config_model.token_url,
-            base_url=config_model.base_url,
-            client_id=config_model.client_id,
-            client_secret=config_model.client_secret,
-            resource_id=config_model.resource_id,
-            api_version=config_model.api_version,
-            timeout=config_model.timeout,
-            grouping_id=config_model.grouping_id,
-            rate_id=config_model.rate_id,
-            business_profile_id=config_model.business_profile_id,
-            business_profile_name=config_model.business_profile_name,
-            source_application_id=config_model.source_application_id,
-            supports_quote=config_model.supports_quote,
-            supports_issue=config_model.supports_issue,
-            supports_documents=config_model.supports_documents,
-            supports_payments=config_model.supports_payments,
-            supports_endorsements=config_model.supports_endorsements,
-            supports_cancellation=config_model.supports_cancellation,
-            supports_renewal=config_model.supports_renewal,
-            settings=settings,
+        return cls._to_configuration(
+            config_model
         )
 
     @classmethod
@@ -142,4 +113,124 @@ class ProviderConfigurationService:
 
         raise InvalidProviderSetting(
             f"Tipo no soportado para '{setting.key}': {value_type}"
+        )
+
+    @classmethod
+    def list_active_for_quote(
+        cls,
+        *,
+        ambiente: str = AseguradoraConfiguracion.Ambiente.SIT,
+        ramo: str = AseguradoraConfiguracion.Ramo.AUTOS,
+    ) -> tuple[ProviderConfiguration, ...]:
+
+        config_models = (
+            AseguradoraConfiguracion.objects
+            .prefetch_related("settings")
+            .filter(
+                ambiente=ambiente,
+                ramo=ramo,
+                activo=True,
+                supports_quote=True,
+            )
+            .order_by(
+                "prioridad",
+                "id",
+            )
+        )
+
+        return tuple(
+            cls._to_configuration(config_model)
+            for config_model in config_models
+        )
+
+    @classmethod
+    def _to_configuration(
+        cls,
+        config_model: AseguradoraConfiguracion,
+    ) -> ProviderConfiguration:
+
+        settings = cls._build_settings(
+            config_model
+        )
+
+        return ProviderConfiguration(
+            id=config_model.id,
+            provider=config_model.provider,
+            ambiente=config_model.ambiente,
+            ramo=config_model.ramo,
+            nombre=config_model.nombre,
+
+            aseguradora_id=config_model.aseguradora_id,
+            producto_seguro_id=(
+                config_model.producto_seguro_id
+            ),
+
+            activo=config_model.activo,
+            prioridad=config_model.prioridad,
+
+            token_url=config_model.token_url,
+            base_url=config_model.base_url,
+            client_id=config_model.client_id,
+            client_secret=config_model.client_secret,
+            resource_id=config_model.resource_id,
+            api_version=config_model.api_version,
+            timeout=config_model.timeout,
+
+            grouping_id=config_model.grouping_id,
+            rate_id=config_model.rate_id,
+            business_profile_id=(
+                config_model.business_profile_id
+            ),
+            business_profile_name=(
+                config_model.business_profile_name
+            ),
+            source_application_id=(
+                config_model.source_application_id
+            ),
+
+            supports_quote=config_model.supports_quote,
+            supports_issue=config_model.supports_issue,
+            supports_documents=(
+                config_model.supports_documents
+            ),
+            supports_payments=(
+                config_model.supports_payments
+            ),
+            supports_endorsements=(
+                config_model.supports_endorsements
+            ),
+            supports_cancellation=(
+                config_model.supports_cancellation
+            ),
+            supports_renewal=config_model.supports_renewal,
+
+            settings=settings,
+        )
+
+    @classmethod
+    def list_active_for_quote(
+        cls,
+        *,
+        ambiente: str = AseguradoraConfiguracion.Ambiente.SIT,
+        ramo: str = AseguradoraConfiguracion.Ramo.AUTOS,
+    ) -> tuple[ProviderConfiguration, ...]:
+
+        config_models = (
+            AseguradoraConfiguracion.objects
+            .prefetch_related("settings")
+            .filter(
+                ambiente=ambiente,
+                ramo=ramo,
+                activo=True,
+                supports_quote=True,
+            )
+            .order_by(
+                "prioridad",
+                "id",
+            )
+        )
+
+        return tuple(
+            cls._to_configuration(config_model)
+            for config_model in config_models
         )

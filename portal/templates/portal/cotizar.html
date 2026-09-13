@@ -90,6 +90,18 @@
                     {{ form.nombre.errors }}
                   </div>
 
+                  <div class="col-md-6">
+                    <label class="cotizar-label">Género</label>
+                    {{ form.genero }}
+                    {{ form.genero.errors }}
+                  </div>
+
+                  <div class="col-md-6">
+                    <label class="cotizar-label">Edad</label>
+                    {{ form.edad }}
+                    {{ form.edad.errors }}
+                  </div>
+
                   <div class="col-12">
                     <label class="cotizar-label">Teléfono</label>
                     {{ form.telefono }}
@@ -119,60 +131,27 @@
 
               <!-- PASO 2 -->
               <div class="cotizar-step {% if show_step_2 %}active{% endif %}" id="step2">
+
                 {% if form.errors %}
                 <div class="alert alert-danger">
-                    <strong>Revisa la información capturada.</strong>
-                    <ul class="mb-0 mt-2">
+                  <strong>Revisa la información capturada.</strong>
+                  <ul class="mb-0 mt-2">
+
                     {% for field in form %}
-                        {% for error in field.errors %}
+                      {% for error in field.errors %}
                         <li>{{ field.label }}: {{ error }}</li>
-                        {% endfor %}
+                      {% endfor %}
                     {% endfor %}
 
                     {% for error in form.non_field_errors %}
-                        <li>{{ error }}</li>
+                      <li>{{ error }}</li>
                     {% endfor %}
-                    </ul>
+
+                  </ul>
                 </div>
                 {% endif %}
 
                 <div class="row g-3">
-
-                  <div class="col-12">
-                    <label class="cotizar-label">Tipo de cliente</label>
-                    {{ form.tipo_cliente }}
-                    {{ form.tipo_cliente.errors }}
-                  </div>
-
-                  <div class="col-12" id="empresaBox">
-                    <label class="cotizar-label">Nombre comercial</label>
-                    {{ form.nombre_comercial }}
-                    {{ form.nombre_comercial.errors }}
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="cotizar-label">Tipo de uso</label>
-                    {{ form.tipo_uso }}
-                    {{ form.tipo_uso.errors }}
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="cotizar-label">Año</label>
-                    {{ form.modelo_anio }}
-                    {{ form.modelo_anio.errors }}
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="cotizar-label">Placas</label>
-                    {{ form.placas }}
-                    {{ form.placas.errors }}
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="cotizar-label">Número de serie / VIN</label>
-                    {{ form.vin }}
-                    {{ form.vin.errors }}
-                  </div>
 
                   <div class="col-md-6">
                     <label class="cotizar-label">Marca</label>
@@ -186,31 +165,60 @@
                     {{ form.submarca.errors }}
                   </div>
 
-                  <div class="col-12">
+                  <div class="col-md-6">
+                    <label class="cotizar-label">Año</label>
+                    {{ form.modelo_anio }}
+                    {{ form.modelo_anio.errors }}
+                  </div>
+
+                  <div class="col-md-6">
                     <label class="cotizar-label">Versión</label>
                     {{ form.catalogo }}
                     {{ form.catalogo.errors }}
-                    <div class="form-text">Selecciona marca, submarca y año para cargar versiones.</div>
                   </div>
 
                   <div class="col-12">
-                    <label class="cotizar-label">Notas</label>
-                    {{ form.notas }}
-                    {{ form.notas.errors }}
+                    <div class="form-text">
+                      Selecciona marca, submarca y año para cargar versiones.
+                    </div>
+                  </div>
+
+                  <div class="col-12 mt-2">
+                    <div class="form-check">
+                      {{ form.acepta_aviso_privacidad }}
+
+                      <label
+                        class="form-check-label"
+                        for="{{ form.acepta_aviso_privacidad.id_for_label }}"
+                      >
+                        {{ form.acepta_aviso_privacidad.label }}
+                      </label>
+
+                      {{ form.acepta_aviso_privacidad.errors }}
+                    </div>
                   </div>
 
                   <div class="col-12 d-flex gap-2 mt-4">
-                    <button type="button" class="btn btn-outline-secondary btn-lg w-50" id="btnBack">
+
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary btn-lg w-50"
+                      id="btnBack"
+                    >
                       Regresar
                     </button>
 
-                    <button type="submit" class="btn btn-primary btn-lg w-50">
+                    <button
+                      type="submit"
+                      class="btn btn-primary btn-lg w-50"
+                    >
                       Cotizar
                     </button>
+
                   </div>
 
                 </div>
-              </div>
+              </div>              
 
             </form>
 

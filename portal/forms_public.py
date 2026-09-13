@@ -50,7 +50,10 @@ class CotizacionPublicaForm(forms.Form):
     genero = forms.ChoiceField(
         required=True,
         label="Género",
-        choices=Cotizacion.GeneroConductor.choices,
+        choices=[
+            ("", "Selecciona género"),
+            *Cotizacion.GeneroConductor.choices,
+        ],
         widget=forms.Select(
             attrs={
                 "class": "form-select",
@@ -108,6 +111,22 @@ class CotizacionPublicaForm(forms.Form):
                 "maxlength": "5",
                 "inputmode": "numeric",
                 "autocomplete": "postal-code",
+            }
+        ),
+    )
+
+    acepta_aviso_privacidad = forms.BooleanField(
+        required=True,
+        label="Acepto que he leído el Aviso de Privacidad",
+        error_messages={
+            "required": (
+                "Debes aceptar el Aviso de Privacidad "
+                "para continuar."
+            ),
+        },
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input",
             }
         ),
     )

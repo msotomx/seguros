@@ -3107,6 +3107,97 @@ class ChubbCatalogClientTest(SimpleTestCase):
             ),
         )
 
+    def test_vehicle_data_allows_null_mtc(self):
+        self.client._get_catalog = Mock(
+            return_value={
+                "messages": None,
+                "vehicles": [
+                    self._vehicle_data_item(
+                        mtc=None,
+                    ),
+                ],
+            }
+        )
+
+        result = self.client.vehicle_data(
+            business_profile_name="BASE_TOM",
+            grouping_id=353991,
+            rate_id=200,
+            vehicle_year=2015,
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].mtc, "")
+
+    def test_vehicle_data_rejects_invalid_mtc_type(self):
+        self.client._get_catalog = Mock(
+            return_value={
+                "messages": None,
+                "vehicles": [
+                    self._vehicle_data_item(
+                        mtc=123,
+                    ),
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            r"vehicles\[0\]\.mtc debe ser texto o null",
+        ):
+            self.client.vehicle_data(
+                business_profile_name="BASE_TOM",
+                grouping_id=353991,
+                rate_id=200,
+                vehicle_year=2015,
+            )
+
+    def test_vehicle_data_allows_empty_vehicle_type_description(self):
+        self.client._get_catalog = Mock(
+            return_value={
+                "messages": None,
+                "vehicles": [
+                    self._vehicle_data_item(
+                        vehicleTypeDescription="",
+                    ),
+                ],
+            }
+        )
+
+        result = self.client.vehicle_data(
+            business_profile_name="BASE_TOM",
+            grouping_id=353991,
+            rate_id=200,
+            vehicle_year=2015,
+        )
+
+        self.assertEqual(
+            result[0].vehicle_type_description,
+            "",
+        )
+
+    def test_vehicle_data_rejects_invalid_vehicle_type_description_type(self):
+        self.client._get_catalog = Mock(
+            return_value={
+                "messages": None,
+                "vehicles": [
+                    self._vehicle_data_item(
+                        vehicleTypeDescription=123,
+                    ),
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            r"vehicles\[0\]\.vehicleTypeDescription debe ser texto o null",
+        ):
+            self.client.vehicle_data(
+                business_profile_name="BASE_TOM",
+                grouping_id=353991,
+                rate_id=200,
+                vehicle_year=2015,
+            )
 
     def test_vehicle_data_calls_expected_endpoint(self):
         self.client._get_catalog = Mock(
@@ -3925,4 +4016,122 @@ class ChubbCatalogClientTest(SimpleTestCase):
                         rate_id=400,
                         use_id=1,
                     )
+
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+from django.test import SimpleTestCase
+
+from integrations.providers.chubb.catalog_client import (
+    ChubbCatalogClient,
+)
+from integrations.providers.chubb.contracts import (
+    ChubbSuburb,
+)
+from integrations.providers.exceptions import (
+    ProviderInvalidResponseError,
+)
+
+
+class ChubbCatalogClientSuburbsTests(SimpleTestCase):
+
+    def setUp(self):
+        self.configuration = SimpleNamespace(
+            provider="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            base_url="https://chubb.test",
+            api_version="1",
+            timeout=30,
+            settings={},
+        )
+
+        self.configuration_service = Mock()
+        self.configuration_service.get_active.return_value = (
+            self.configuration
+        )
+
+        self.token = Mock()
+
+        self.auth_client = Mock()
+        self.auth_client.get_token.return_value = (
+            self.token
+        )
+
+        self.http_client = Mock()
+
+        self.client = ChubbCatalogClient(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=(
+                self.configuration_service
+            ),
+            auth_client=self.auth_client,
+            http_client=self.http_client,
+        )
+
+    def test_suburbs_consulta_endpoint_por_codigo_postal(
+        self,
+    ):
+        self.http_client.get.return_value = (
+            SimpleNamespace(
+                data={
+                    "suburbs": [
+                        {
+                            "suburbId": 12,
+                            "suburbDescription": "CENTRO",
+                            "countrySubdivisionId": 5,
+                            "municipalityId": 369,
+                            "populationId": 123,
+                        }
+                    ]
+                }
+            )
+        )
+
+        result = self.client.suburbs(
+            zip_code="32500",
+        )
+
+        self.auth_client.get_token.assert_called_once_with()
+
+        self.http_client.get.assert_called_once_with(
+            "/catalogs/locations/suburbs",
+            token=self.token,
+            params={
+                "ZipCode": "32500",
+            },
+        )
+
+        self.assertEqual(
+            len(result),
+            1,
+        )
+
+        self.assertIsInstance(
+            result[0],
+            ChubbSuburb,
+        )
+
+        self.assertEqual(
+            result[0].suburb_id,
+            12,
+        )
+
+        self.assertEqual(
+            result[0].name,
+            "CENTRO",
+        )
+
+    def test_suburbs_rechaza_zip_code_vacio(
+        self,
+    ):
+        with self.assertRaises(
+            ProviderInvalidResponseError
+        ):
+            self.client.suburbs(
+                zip_code="",
+            )
+
+        self.http_client.get.assert_not_called()
 

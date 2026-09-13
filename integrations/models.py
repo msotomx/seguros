@@ -107,20 +107,24 @@ class AseguradoraConfiguracion(models.Model):
         null=True,
         blank=True,
     )
-
+    producto_seguro = models.ForeignKey(
+        "catalogos.ProductoSeguro",
+        on_delete=models.PROTECT,
+        related_name="configuraciones_api",
+        null=True,
+        blank=True,
+    )
     provider = models.CharField(
         max_length=30,
         choices=Provider.choices,
         db_index=True,
     )
-
     ambiente = models.CharField(
         max_length=20,
         choices=Ambiente.choices,
         default=Ambiente.SIT,
         db_index=True,
     )
-
     ramo = models.CharField(
         max_length=30,
         choices=Ramo.choices,

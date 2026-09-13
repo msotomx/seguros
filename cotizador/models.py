@@ -65,7 +65,30 @@ class Cotizacion(TimeStampedModel):
     )
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="cotizaciones")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.SET_NULL, null=True, blank=True, related_name="cotizaciones")
-    conductor_nombre = models.CharField(max_length=120, blank=True, default="")
+    conductor_nombre = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+    )
+    conductor_apellido_paterno = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+    )
+    conductor_apellido_materno = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+    )
+    conductor_rfc = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+    )
+    conductor_fecha_nacimiento = models.DateField(
+        null=True,
+        blank=True,
+    )
     conductor_genero = models.CharField(
         max_length=20,
         choices=GeneroConductor.choices,
@@ -73,7 +96,10 @@ class Cotizacion(TimeStampedModel):
         default="",
         db_index=True,
     )
-    conductor_edad = models.PositiveSmallIntegerField(null=True, blank=True)
+    conductor_edad = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+    )
     codigo_postal = models.CharField(max_length=5, blank=True, default="", db_index=True)
     ciudad = models.CharField(max_length=100, blank=True, default="")
     estado = models.CharField(max_length=100, blank=True, default="")
@@ -526,5 +552,75 @@ class CotizacionProveedorCobertura(TimeStampedModel):
         indexes = [
             models.Index(
                 fields=["opcion", "code"]
+            ),
+        ]
+
+class CotizacionProveedorPersona(TimeStampedModel):
+    """
+    Identidad de una persona registrada en un proveedor externo
+    para una cotización.
+
+    Los identificadores son deliberadamente texto porque cada
+    proveedor puede manejar formatos diferentes.
+    """
+
+    class Rol(models.TextChoices):
+        ASEGURADO = "ASEGURADO", "Asegurado"
+        PROPIETARIO = "PROPIETARIO", "Propietario"
+        BENEFICIARIO = "BENEFICIARIO", "Beneficiario"
+
+    cotizacion = models.ForeignKey(
+        Cotizacion,
+        on_delete=models.CASCADE,
+        related_name="personas_proveedor",
+    )
+
+    provider_code = models.CharField(
+        max_length=30,
+        db_index=True,
+    )
+
+    rol = models.CharField(
+        max_length=20,
+        choices=Rol.choices,
+        db_index=True,
+    )
+
+    provider_tran_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_person_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_address_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    raw_response = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["cotizacion", "provider_code", "rol"],
+                name="uq_cotizacion_provider_persona_rol",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["cotizacion", "provider_code", "rol"],
             ),
         ]

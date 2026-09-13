@@ -28,6 +28,10 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
         PERSONA = "PERSONA", "Persona"
         EMPRESA = "EMPRESA", "Empresa"
 
+    class Genero(models.TextChoices):
+        MASCULINO = "MASCULINO", "Masculino"
+        FEMENINO = "FEMENINO", "Femenino"
+
     class Estatus(models.TextChoices):
         PROSPECTO = "PROSPECTO", "Prospecto"
         ACTIVO = "ACTIVO", "Activo"
@@ -38,6 +42,8 @@ class Cliente(TimeStampedModel, SoftDeleteModel):
     nombre = models.CharField(max_length=120, blank=True, default="")            # persona
     apellido_paterno = models.CharField(max_length=50, blank=True, default="")
     apellido_materno = models.CharField(max_length=50, blank=True, default="")
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    genero = models.CharField(max_length=20, choices=Genero.choices, blank=True, default="", db_index=True)
     contacto_nombre = models.CharField(max_length=50, blank=True, default="")
     contacto_email = models.EmailField(blank=True, default="")
     contacto_telefono = models.CharField(max_length=30, blank=True, default="")

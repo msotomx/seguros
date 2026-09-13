@@ -1,0 +1,356 @@
+{% extends "portal/base.html" %}
+
+{% block title %}
+Resumen de tu seguro
+{% endblock %}
+
+{% block content %}
+
+<div class="py-4">
+
+  <div class="row justify-content-center">
+    <div class="col-xl-10">
+
+      <div class="text-center mb-4">
+        <span class="badge text-bg-primary mb-2">
+          Paso 6
+        </span>
+
+        <h1 class="fw-bold mb-2">
+          Revisa tu información
+        </h1>
+
+        <p class="text-muted mb-0">
+          Confirma que todos los datos sean correctos
+          antes de solicitar la emisión de tu póliza.
+        </p>
+      </div>
+
+
+      <!-- OPCIÓN SELECCIONADA -->
+
+      <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-4">
+
+          <div class="row align-items-center g-3">
+
+            <div class="col-md-8">
+
+              <div class="text-muted small">
+                Seguro seleccionado
+              </div>
+
+              <h4 class="fw-bold mb-1">
+                {{ item.aseguradora.nombre }}
+                —
+                {{ item.paquete_nombre }}
+              </h4>
+
+              <div class="text-muted">
+                {{ item.producto.nombre_producto }}
+              </div>
+
+            </div>
+
+            <div class="col-md-4 text-md-end">
+
+              <div class="text-muted small">
+                Precio de la póliza
+              </div>
+
+              <div class="display-6 fw-bold text-primary">
+                ${{ item.prima_total|floatformat:2 }}
+              </div>
+
+              <div class="text-muted small">
+                MXN
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+
+
+      <div class="row g-4">
+
+        <!-- CONDUCTOR -->
+
+        <div class="col-lg-6">
+
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+
+              <h5 class="fw-bold mb-3">
+                <i class="bi bi-person me-2"></i>
+                Conductor
+              </h5>
+
+              <dl class="row mb-0">
+
+                <dt class="col-5">Nombre</dt>
+                <dd class="col-7">
+                  {{ cotizacion.conductor_nombre }}
+                  {{ cotizacion.conductor_apellido_paterno }}
+                  {{ cotizacion.conductor_apellido_materno }}
+                </dd>
+
+                <dt class="col-5">RFC</dt>
+                <dd class="col-7">
+                  {{ cotizacion.conductor_rfc }}
+                </dd>
+
+                <dt class="col-5">
+                  Fecha nacimiento
+                </dt>
+                <dd class="col-7">
+                  {{ cotizacion.conductor_fecha_nacimiento|date:"d/m/Y" }}
+                </dd>
+
+                <dt class="col-5">Género</dt>
+                <dd class="col-7">
+                  {{ cotizacion.get_conductor_genero_display }}
+                </dd>
+
+              </dl>
+
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- DIRECCIÓN -->
+
+        <div class="col-lg-6">
+
+          <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+
+              <h5 class="fw-bold mb-3">
+                <i class="bi bi-geo-alt me-2"></i>
+                Dirección
+              </h5>
+
+              <div>
+                {{ direccion.calle }}
+                {{ direccion.num_ext }}
+                {% if direccion.num_int %}
+                  Int. {{ direccion.num_int }}
+                {% endif %}
+              </div>
+
+              <div>
+                {{ direccion.colonia }}
+              </div>
+
+              <div>
+                {{ direccion.ciudad }},
+                {{ direccion.estado }}
+              </div>
+
+              <div>
+                C.P. {{ direccion.cp }}
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- VEHÍCULO -->
+
+        <div class="col-12">
+
+          <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+
+              <h5 class="fw-bold mb-3">
+                <i class="bi bi-car-front me-2"></i>
+                Vehículo
+              </h5>
+
+              <div class="row g-3">
+
+                <div class="col-md-3">
+                  <div class="text-muted small">
+                    Marca
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.marca_texto }}
+                  </div>
+                </div>
+
+                <div class="col-md-3">
+                  <div class="text-muted small">
+                    Submarca
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.submarca_texto }}
+                  </div>
+                </div>
+
+                <div class="col-md-3">
+                  <div class="text-muted small">
+                    Modelo
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.modelo_anio }}
+                  </div>
+                </div>
+
+                <div class="col-md-3">
+                  <div class="text-muted small">
+                    Versión
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.version }}
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <div class="text-muted small">
+                    Placas
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.placas }}
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <div class="text-muted small">
+                    Número de serie / VIN
+                  </div>
+                  <div class="fw-semibold">
+                    {{ vehiculo.vin }}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+
+        <!-- COBERTURAS -->
+
+        <div class="col-12">
+
+          <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+
+              <h5 class="fw-bold mb-3">
+                Coberturas
+              </h5>
+
+              <div class="table-responsive">
+
+                <table class="table align-middle mb-0">
+
+                  <thead>
+                    <tr>
+                      <th>Cobertura</th>
+                      <th class="text-end">
+                        Suma asegurada
+                      </th>
+                      <th class="text-end">
+                        Deducible
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+
+                    {% for cobertura in opcion.coberturas.all %}
+
+                      <tr>
+
+                        <td>
+                          {{ cobertura.name }}
+                        </td>
+
+                        <td class="text-end">
+
+                          {% if cobertura.insured_amount %}
+                            ${{ cobertura.insured_amount|floatformat:2 }}
+                          {% else %}
+                            Amparada
+                          {% endif %}
+
+                        </td>
+
+                        <td class="text-end">
+
+                          {% if cobertura.deductible %}
+                            {{ cobertura.deductible|floatformat:2 }}%
+                          {% else %}
+                            N/A
+                          {% endif %}
+
+                        </td>
+
+                      </tr>
+
+                    {% endfor %}
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- EMISIÓN -->
+
+      <div class="card border-primary mt-4">
+
+        <div class="card-body p-4 text-center">
+
+          <h5 class="fw-bold">
+            ¿Todo está correcto?
+          </h5>
+
+          <p class="text-muted">
+            El siguiente paso solicitará la emisión
+            de la póliza a la aseguradora.
+          </p>
+
+          <!--
+              Todavía NO conectamos emisión.
+              No crear póliza TEMP ni marcar Cotizacion EMITIDA.
+          -->
+
+          <button
+            type="button"
+            class="btn btn-primary btn-lg"
+            disabled
+          >
+            Emitir póliza
+          </button>
+
+          <div class="small text-muted mt-2">
+            Emisión en integración
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

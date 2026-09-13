@@ -215,3 +215,12 @@ class ChubbMunicipality:
     municipality_id: int
     name: str
     description: str = ""
+
+@dataclass(frozen=True, slots=True)
+class ChubbSuburb:
+    suburb_id: int
+    name: str
+    description: str = ""
+    country_subdivision_id: int | None = None
+    municipality_id: int | None = None
+    population_id: int | None = None

@@ -13,8 +13,16 @@ from portal.views.polizas import PortalPolizaListView
 from portal.views.pagos import PortalPagoListView, PortalPagoDetailView
 from portal.views.pagos import PortalPagoCheckoutView, PortalPagoReturnView
 from portal.views.ajax import portal_ajax_submarcas_por_marca, portal_ajax_catalogos_por_submarca
-from portal.views.cotizar import PortalCotizacionOpcionesView, PortalSeleccionarCotizacionItemView
+from portal.views.cotizacion_opciones import PortalCotizacionOpcionesView
 from portal.views.cotizar import PortalCotizacionGraciasView
+from portal.views.cotizacion_emision import (
+    PortalCotizacionConductorView,
+    PortalSeleccionarCotizacionItemView,
+    PortalCotizacionDireccionView,
+    PortalCotizacionVehiculoView,
+    PortalSeleccionarCotizacionItemView,
+    PortalCotizacionResumenEmisionView,
+)
 
 app_name = "portal"
 
@@ -44,9 +52,25 @@ urlpatterns = [
     path("ajax/submarcas/", portal_ajax_submarcas_por_marca, name="ajax_submarcas_por_marca"),
     path("ajax/catalogos-vehiculo/", portal_ajax_catalogos_por_submarca, name="ajax_catalogos_por_submarca"),
     path("cotizaciones/<int:pk>/opciones/", PortalCotizacionOpcionesView.as_view(), name="cotizacion_opciones"),
-    path("cotizaciones/<int:pk>/seleccionar/<int:item_id>/", PortalSeleccionarCotizacionItemView.as_view(),
-            name="cotizacion_seleccionar_item"),
     path("cotizaciones/<int:pk>/gracias/", PortalCotizacionGraciasView.as_view(),
             name="cotizacion_gracias"),
+    path("cotizaciones/<int:pk>/conductor/", PortalCotizacionConductorView.as_view(),
+        name="cotizacion_conductor"),            
+    path("cotizaciones/<int:pk>/seleccionar/<int:item_id>/", PortalSeleccionarCotizacionItemView.as_view(),
+        name="cotizacion_seleccionar_item"),
+    path(
+        "cotizaciones/<int:pk>/direccion/",
+        PortalCotizacionDireccionView.as_view(),
+        name="cotizacion_direccion",
+        ),
+    path(
+        "cotizaciones/<int:pk>/vehiculo/",
+        PortalCotizacionVehiculoView.as_view(),
+        name="cotizacion_vehiculo",
+        ),
+    path(
+        "cotizaciones/<int:pk>/resumen-emision/",
+        PortalCotizacionResumenEmisionView.as_view(),
+        name="cotizacion_resumen_emision",
+        ),
 ]
-

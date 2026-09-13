@@ -19,6 +19,7 @@ class ProviderConfiguration:
     nombre: str
 
     aseguradora_id: int | None = None
+    producto_seguro_id: int | None = None
     activo: bool = True
     prioridad: int = 100
 

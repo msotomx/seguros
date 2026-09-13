@@ -1,72 +1,316 @@
 {% extends "portal/base.html" %}
 
-{% block content %}
-<div class="container py-5">
+{% block title %}
+Opciones de Seguro
+{% endblock %}
 
-  <div class="mb-4">
-    <h3 class="mb-1">Opciones de cotización</h3>
+{% block content %}
+
+<div class="py-4">
+
+  <!-- ===================================================== -->
+  <!-- ENCABEZADO -->
+  <!-- ===================================================== -->
+
+  <div class="text-center mb-4">
+
+    <span class="badge text-bg-primary mb-2">
+      Paso 2
+    </span>
+
+    <h1 class="fw-bold mb-2">
+      Estas son tus opciones
+    </h1>
+
     <p class="text-muted mb-0">
-      Selecciona la opción que mejor se adapte a tus necesidades.
+      Compara precio, coberturas y deducibles
+      antes de seleccionar tu seguro.
     </p>
+
   </div>
 
-  {% if items %}
-    <div class="row g-4">
-      {% for item in items %}
-      <div class="col-md-4">
-        <div class="card shadow-sm border-0 h-100 {% if item.seleccionada %}border border-success{% endif %}">
-          <div class="card-body d-flex flex-column">
 
-            <div class="d-flex justify-content-between align-items-start mb-3">
-              <div>
-                <h5 class="mb-1">{{ item.aseguradora }}</h5>
-                <div class="text-muted small">{{ item.producto }}</div>
+  <!-- ===================================================== -->
+  <!-- DATOS COTIZADOS -->
+  <!-- ===================================================== -->
+
+  <div class="card shadow-sm border-0 mb-4">
+
+    <div class="card-body">
+
+      <div class="row g-4">
+
+        <!-- Conductor -->
+
+        <div class="col-md-6">
+
+          <div class="d-flex gap-3">
+
+            <div class="fs-3 text-primary">
+              <i class="bi bi-person-circle"></i>
+            </div>
+
+            <div>
+
+              <div class="text-muted small">
+                Conductor
               </div>
 
-              {% if item.seleccionada %}
-                <span class="badge text-bg-success">Seleccionada</span>
-              {% else %}
-                <span class="badge text-bg-light text-dark">Opción {{ item.ranking }}</span>
-              {% endif %}
-            </div>
-
-            <div class="mb-3">
-              <div class="text-muted small">Prima total</div>
-              <div class="fs-3 fw-bold text-primary">
-                ${{ item.prima_total }}
+              <div class="fw-semibold">
+                {{ cotizacion.conductor_nombre }}
               </div>
-            </div>
 
-            <div class="small text-muted mb-3">
-              <div>Prima neta: ${{ item.prima_neta }}</div>
-              <div>Derechos: ${{ item.derechos }}</div>
-              <div>IVA: ${{ item.iva }}</div>
-            </div>
+              <div class="small">
+                {{ cotizacion.conductor_edad }} años
+                ·
+                {{ cotizacion.get_conductor_genero_display }}
+              </div>
 
-            <form method="post"
-                  action="{% url 'portal:cotizacion_seleccionar_item' cotizacion.pk item.pk %}"
-                  class="mt-auto">
-              {% csrf_token %}
-              <button class="btn btn-primary w-100"
-                      {% if item.seleccionada %}disabled{% endif %}>
-                {% if item.seleccionada %}
-                  Opción seleccionada
-                {% else %}
-                  Seleccionar opción
-                {% endif %}
-              </button>
-            </form>
+            </div>
 
           </div>
+
         </div>
+
+
+        <!-- Vehículo -->
+
+        <div class="col-md-6">
+
+          <div class="d-flex gap-3">
+
+            <div class="fs-3 text-primary">
+              <i class="bi bi-car-front"></i>
+            </div>
+
+            <div>
+
+              <div class="text-muted small">
+                Vehículo
+              </div>
+
+              <div class="fw-semibold">
+                {{ cotizacion.vehiculo.marca_texto }}
+                {{ cotizacion.vehiculo.submarca_texto }}
+                {{ cotizacion.vehiculo.modelo_anio }}
+              </div>
+
+              <div class="small">
+                {{ cotizacion.vehiculo.version }}
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- ===================================================== -->
+  <!-- OPCIONES -->
+  <!-- ===================================================== -->
+
+  {% if items %}
+
+    <div class="row g-4">
+
+      {% for item in items %}
+
+        <div class="col-12">
+
+          <div class="card shadow-sm border-0">
+
+            <div class="card-body p-4">
+
+              <div class="row g-4">
+
+                <!-- ======================================= -->
+                <!-- PRECIO / ASEGURADORA -->
+                <!-- ======================================= -->
+
+                <div class="col-lg-4">
+
+                  <div class="text-muted small mb-1">
+                    {{ item.aseguradora.nombre }}
+                  </div>
+
+                  <h4 class="fw-bold mb-1">
+                    {{ item.paquete_nombre }}
+                  </h4>
+
+                  <div class="text-muted small mb-4">
+                    {{ item.producto.nombre_producto }}
+                  </div>
+
+
+                  <div class="text-muted">
+                    Precio de la póliza
+                  </div>
+
+                  <div class="display-6 fw-bold text-primary">
+                    ${{ item.prima_total|floatformat:2 }}
+                  </div>
+
+                  <div class="text-muted small mb-4">
+                    MXN
+                  </div>
+
+
+                  <form
+                    method="post"
+                    action="{% url 'portal:cotizacion_seleccionar_item' cotizacion.pk item.pk %}"
+                  >
+
+                    {% csrf_token %}
+
+                    <button
+                      type="submit"
+                      class="btn btn-primary btn-lg w-100"
+                    >
+                      Seleccionar
+                      <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+
+                  </form>
+
+                </div>
+
+
+                <!-- ======================================= -->
+                <!-- COBERTURAS -->
+                <!-- ======================================= -->
+
+                <div class="col-lg-8">
+
+                  <h5 class="fw-bold mb-3">
+                    Coberturas
+                  </h5>
+
+                  <div class="table-responsive">
+
+                    <table
+                      class="table align-middle mb-0"
+                    >
+
+                      <thead>
+                        <tr>
+                          <th>Cobertura</th>
+                          <th class="text-end">
+                            Suma asegurada
+                          </th>
+                          <th class="text-end">
+                            Deducible
+                          </th>
+                        </tr>
+                      </thead>
+
+                      <tbody>
+
+                        {% for cobertura in item.provider_option.coberturas.all %}
+
+                          <tr>
+
+                            <td class="fw-medium">
+                              {{ cobertura.name }}
+                            </td>
+
+                            <td class="text-end">
+
+                              {% if cobertura.insured_amount %}
+
+                                ${{ cobertura.insured_amount|floatformat:2 }}
+
+                              {% else %}
+
+                                <span class="text-muted">
+                                  Amparada
+                                </span>
+
+                              {% endif %}
+
+                            </td>
+
+                            <td class="text-end">
+
+                              {% if cobertura.deductible %}
+
+                                {{ cobertura.deductible|floatformat:2 }}%
+
+                              {% else %}
+
+                                <span class="text-muted">
+                                  N/A
+                                </span>
+
+                              {% endif %}
+
+                            </td>
+
+                          </tr>
+
+                        {% empty %}
+
+                          <tr>
+                            <td
+                              colspan="3"
+                              class="text-muted text-center py-3"
+                            >
+                              No se recibió detalle de coberturas.
+                            </td>
+                          </tr>
+
+                        {% endfor %}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
       {% endfor %}
+
     </div>
+
   {% else %}
-    <div class="alert alert-warning">
-      No se encontraron opciones disponibles para esta cotización.
+
+    <div class="alert alert-warning text-center">
+
+      <i class="bi bi-exclamation-triangle me-2"></i>
+
+      No encontramos opciones disponibles para esta
+      cotización.
+
     </div>
+
+    <div class="text-center mt-3">
+
+      <a
+        href="{% url 'portal:cotizar' %}"
+        class="btn btn-outline-primary"
+      >
+        Realizar otra cotización
+      </a>
+
+    </div>
+
   {% endif %}
 
 </div>
+
 {% endblock %}

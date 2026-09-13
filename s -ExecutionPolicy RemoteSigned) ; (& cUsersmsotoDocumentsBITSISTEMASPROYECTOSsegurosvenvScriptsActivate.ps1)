@@ -1,0 +1,537 @@
+[1mdiff --git a/portal/templates/portal/cotizar.html b/portal/templates/portal/cotizar.html[m
+[1mindex fb64d56..a951080 100644[m
+[1m--- a/portal/templates/portal/cotizar.html[m
+[1m+++ b/portal/templates/portal/cotizar.html[m
+[36m@@ -1,330 +1,241 @@[m
+ {% extends "portal/base.html" %}[m
+ [m
+[32m+[m[32m{% block title %}[m
+[32m+[m[32mCotiza tu Seguro de Auto[m
+[32m+[m[32m{% endblock %}[m
+[32m+[m
+ {% block content %}[m
+ [m
+[31m-<div class="cotizar-page py-5">[m
+[31m-  <div class="container">[m
+[31m-    <div class="row g-4 align-items-stretch">[m
+[32m+[m[32m<div class="cotizar-page py-4">[m
+[32m+[m
+[32m+[m[32m  <div class="row justify-content-center">[m
+[32m+[m
+[32m+[m[32m    <div class="col-xl-10">[m
+ [m
+[31m-      <!-- LADO IZQUIERDO -->[m
+[31m-      <div class="col-lg-6">[m
+[31m-        <div class="cotizar-hero h-100">[m
+[32m+[m[32m      <div class="text-center mb-4">[m
+ [m
+[31m-          <div class="trust-badge mb-4">[m
+[31m-            <i class="bi bi-shield-check"></i>[m
+[31m-            Cotización segura y personalizada[m
+[31m-          </div>[m
+[32m+[m[32m        <span class="badge text-bg-primary mb-2">[m
+[32m+[m[32m          Paso 1[m
+[32m+[m[32m        </span>[m
+ [m
+[31m-          <h1 class="display-5 fw-bold mb-3">[m
+[31m-            Protege tu auto hoy mismo con la mejor cobertura [m
+[31m-          </h1>[m
+[32m+[m[32m        <h1 class="fw-bold mb-2">[m
+[32m+[m[32m          Cotiza tu Seguro de Auto[m
+[32m+[m[32m        </h1>[m
+[32m+[m
+[32m+[m[32m        <p class="text-muted mb-0">[m
+[32m+[m[32m          Captura tus datos y los de tu vehículo[m
+[32m+[m[32m          para consultar las opciones disponibles.[m
+[32m+[m[32m        </p>[m
+[32m+[m
+[32m+[m[32m      </div>[m
+ [m
+[31m-          <p class="lead mb-4" style="opacity:.9;">[m
+[31m-            Compara opciones, elige la que más te convenga y permite que un agente especializado te acompañe en el proceso.[m
+[31m-          </p>[m
+[32m+[m[32m      <div class="card shadow-sm border-0">[m
+ [m
+[31m-          <div class="mt-5">[m
+[32m+[m[32m        <div class="card-body p-4 p-lg-5">[m
+ [m
+[31m-            <div class="benefit-item">[m
+[31m-              <div class="benefit-icon">[m
+[31m-                <i class="bi bi-lock"></i>[m
+[32m+[m[32m          <form method="post">[m
+[32m+[m
+[32m+[m[32m            {% csrf_token %}[m
+[32m+[m
+[32m+[m[32m            {% if form.non_field_errors %}[m
+[32m+[m[32m              <div class="alert alert-danger">[m
+[32m+[m[32m                {{ form.non_field_errors }}[m
+               </div>[m
+[31m-              <div>[m
+[31m-                <div class="fw-semibold">Tus datos están protegidos</div>[m
+[31m-                <div style="opacity:.8;">Usamos tu información únicamente para generar tu cotización.</div>[m
+[32m+[m[32m            {% endif %}[m
+[32m+[m
+[32m+[m[32m            {% if form.errors %}[m
+[32m+[m[32m              <div class="alert alert-danger">[m
+[32m+[m[32m                <strong>[m
+[32m+[m[32m                  Revisa la información capturada.[m
+[32m+[m[32m                </strong>[m
+               </div>[m
+[31m-            </div>[m
+[32m+[m[32m            {% endif %}[m
+[32m+[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m[32m            <!-- DATOS DEL CONDUCTOR / PROSPECTO -->[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m
+[32m+[m[32m            <h4 class="fw-semibold mb-3">[m
+[32m+[m[32m              Datos del conductor[m
+[32m+[m[32m            </h4>[m
+ [m
+[31m-            <div class="benefit-item">[m
+[31m-              <div class="benefit-icon">[m
+[31m-                <i class="bi bi-car-front"></i>[m
+[32m+[m[32m            <div class="row g-3">[m
+[32m+[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.nombre.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.nombre.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.nombre }}[m
+[32m+[m[32m                {{ form.nombre.errors }}[m
+               </div>[m
+[31m-              <div>[m
+[31m-                <div class="fw-semibold">Cotización para tu vehículo</div>[m
+[31m-                <div style="opacity:.8;">Captura marca, modelo y versión para obtener mejores opciones.</div>[m
+[32m+[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.genero.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.genero.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.genero }}[m
+[32m+[m[32m                {{ form.genero.errors }}[m
+               </div>[m
+[31m-            </div>[m
+ [m
+[31m-            <div class="benefit-item">[m
+[31m-              <div class="benefit-icon">[m
+[31m-                <i class="bi bi-person-check"></i>[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.email.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.email.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.email }}[m
+[32m+[m[32m                {{ form.email.errors }}[m
+               </div>[m
+[31m-              <div>[m
+[31m-                <div class="fw-semibold">Atención de un agente</div>[m
+[31m-                <div style="opacity:.8;">Después de elegir una opción, un agente te contactará para continuar.</div>[m
+[32m+[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.telefono.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.telefono.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.telefono }}[m
+[32m+[m[32m                {{ form.telefono.errors }}[m
+               </div>[m
+[31m-            </div>[m
+ [m
+[31m-          </div>[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.edad.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.edad.label }} *[m
+[32m+[m[32m                </label>[m
+ [m
+[31m-        </div>[m
+[31m-      </div>[m
+[32m+[m[32m                {{ form.edad }}[m
+[32m+[m[32m                {{ form.edad.errors }}[m
+[32m+[m[32m              </div>[m
+ [m
+[31m-      <!-- LADO DERECHO -->[m
+[31m-      <div class="col-lg-6">[m
+[31m-        <div class="card cotizar-card h-100">[m
+[31m-          <div class="card-body p-4 p-lg-5">[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.codigo_postal.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.codigo_postal.label }} *[m
+[32m+[m[32m                </label>[m
+ [m
+[31m-            <div class="d-flex justify-content-between align-items-center mb-4">[m
+[31m-              <div>[m
+[31m-                <h3 class="fw-bold mb-1">Cotiza tu seguro</h3>[m
+[31m-                <div class="text-muted">Completa tus datos para iniciar.</div>[m
+[32m+[m[32m                {{ form.codigo_postal }}[m
+[32m+[m[32m                {{ form.codigo_postal.errors }}[m
+               </div>[m
+[31m-              <span class="step-pill" id="stepLabel">[m
+[31m-                {% if show_step_2 %}Paso 2 de 2{% else %}Paso 1 de 2{% endif %}[m
+[31m-              </span>[m
+ [m
+             </div>[m
+ [m
+[31m-            <form method="post" id="cotizarForm">[m
+[31m-              {% csrf_token %}[m
+[31m-              {{ form.non_field_errors }}[m
+[31m-[m
+[31m-              <!-- PASO 1 -->[m
+[31m-              <div class="cotizar-step {% if not show_step_2 %}active{% endif %}" id="step1">[m
+[31m-                <div class="row g-3">[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Nombre</label>[m
+[31m-                    {{ form.nombre }}[m
+[31m-                    {{ form.nombre.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Teléfono</label>[m
+[31m-                    {{ form.telefono }}[m
+[31m-                    {{ form.telefono.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Email</label>[m
+[31m-                    {{ form.email }}[m
+[31m-                    {{ form.email.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Código postal</label>[m
+[31m-                    {{ form.codigo_postal }}[m
+[31m-                    {{ form.codigo_postal.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12 mt-4">[m
+[31m-                    <button type="button" class="btn btn-primary btn-lg w-100" id="btnNext">[m
+[31m-                      Continuar[m
+[31m-                    </button>[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                </div>[m
+[32m+[m[32m            <hr class="my-4">[m
+[32m+[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m[32m            <!-- VEHÍCULO -->[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m
+[32m+[m[32m            <h4 class="fw-semibold mb-3">[m
+[32m+[m[32m              Datos del vehículo[m
+[32m+[m[32m            </h4>[m
+[32m+[m
+[32m+[m[32m            <div class="row g-3">[m
+[32m+[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.marca.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.marca.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.marca }}[m
+[32m+[m[32m                {{ form.marca.errors }}[m
+               </div>[m
+ [m
+[31m-              <!-- PASO 2 -->[m
+[31m-              <div class="cotizar-step {% if show_step_2 %}active{% endif %}" id="step2">[m
+[31m-                {% if form.errors %}[m
+[31m-                <div class="alert alert-danger">[m
+[31m-                    <strong>Revisa la información capturada.</strong>[m
+[31m-                    <ul class="mb-0 mt-2">[m
+[31m-                    {% for field in form %}[m
+[31m-                        {% for error in field.errors %}[m
+[31m-                        <li>{{ field.label }}: {{ error }}</li>[m
+[31m-                        {% endfor %}[m
+[31m-                    {% endfor %}[m
+[31m-[m
+[31m-                    {% for error in form.non_field_errors %}[m
+[31m-                        <li>{{ error }}</li>[m
+[31m-                    {% endfor %}[m
+[31m-                    </ul>[m
+[31m-                </div>[m
+[31m-                {% endif %}[m
+[31m-[m
+[31m-                <div class="row g-3">[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Tipo de cliente</label>[m
+[31m-                    {{ form.tipo_cliente }}[m
+[31m-                    {{ form.tipo_cliente.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12" id="empresaBox">[m
+[31m-                    <label class="cotizar-label">Nombre comercial</label>[m
+[31m-                    {{ form.nombre_comercial }}[m
+[31m-                    {{ form.nombre_comercial.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Tipo de uso</label>[m
+[31m-                    {{ form.tipo_uso }}[m
+[31m-                    {{ form.tipo_uso.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Año</label>[m
+[31m-                    {{ form.modelo_anio }}[m
+[31m-                    {{ form.modelo_anio.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Placas</label>[m
+[31m-                    {{ form.placas }}[m
+[31m-                    {{ form.placas.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Número de serie / VIN</label>[m
+[31m-                    {{ form.vin }}[m
+[31m-                    {{ form.vin.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Marca</label>[m
+[31m-                    {{ form.marca }}[m
+[31m-                    {{ form.marca.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-md-6">[m
+[31m-                    <label class="cotizar-label">Submarca</label>[m
+[31m-                    {{ form.submarca }}[m
+[31m-                    {{ form.submarca.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Versión</label>[m
+[31m-                    {{ form.catalogo }}[m
+[31m-                    {{ form.catalogo.errors }}[m
+[31m-                    <div class="form-text">Selecciona marca, submarca y año para cargar versiones.</div>[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12">[m
+[31m-                    <label class="cotizar-label">Notas</label>[m
+[31m-                    {{ form.notas }}[m
+[31m-                    {{ form.notas.errors }}[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                  <div class="col-12 d-flex gap-2 mt-4">[m
+[31m-                    <button type="button" class="btn btn-outline-secondary btn-lg w-50" id="btnBack">[m
+[31m-                      Regresar[m
+[31m-                    </button>[m
+[31m-[m
+[31m-                    <button type="submit" class="btn btn-primary btn-lg w-50">[m
+[31m-                      Cotizar[m
+[31m-                    </button>[m
+[31m-                  </div>[m
+[31m-[m
+[31m-                </div>[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.submarca.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.submarca.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.submarca }}[m
+[32m+[m[32m                {{ form.submarca.errors }}[m
+               </div>[m
+ [m
+[31m-            </form>[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.modelo_anio.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.modelo_anio.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.modelo_anio }}[m
+[32m+[m[32m                {{ form.modelo_anio.errors }}[m
+[32m+[m[32m              </div>[m
+[32m+[m
+[32m+[m[32m              <div class="col-md-6">[m
+[32m+[m[32m                <label[m
+[32m+[m[32m                  class="form-label fw-semibold"[m
+[32m+[m[32m                  for="{{ form.catalogo.id_for_label }}"[m
+[32m+[m[32m                >[m
+[32m+[m[32m                  {{ form.catalogo.label }} *[m
+[32m+[m[32m                </label>[m
+[32m+[m
+[32m+[m[32m                {{ form.catalogo }}[m
+[32m+[m[32m                {{ form.catalogo.errors }}[m
+[32m+[m[32m              </div>[m
+[32m+[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <hr class="my-4">[m
+[32m+[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m[32m            <!-- AVISO DE PRIVACIDAD -->[m
+[32m+[m[32m            <!-- ========================================= -->[m
+[32m+[m
+[32m+[m[32m            <div class="form-check mb-4">[m
+[32m+[m
+[32m+[m[32m              {{ form.acepta_aviso_privacidad }}[m
+[32m+[m
+[32m+[m[32m              <label[m
+[32m+[m[32m                class="form-check-label"[m
+[32m+[m[32m                for="{{ form.acepta_aviso_privacidad.id_for_label }}"[m
+[32m+[m[32m              >[m
+[32m+[m[32m                {{ form.acepta_aviso_privacidad.label }}[m
+[32m+[m[32m              </label>[m
+[32m+[m
+[32m+[m[32m              {{ form.acepta_aviso_privacidad.errors }}[m
+[32m+[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <button[m
+[32m+[m[32m              type="submit"[m
+[32m+[m[32m              class="btn btn-primary btn-lg w-100"[m
+[32m+[m[32m            >[m
+[32m+[m[32m              Cotizar[m
+[32m+[m[32m              <i class="bi bi-arrow-right ms-1"></i>[m
+[32m+[m[32m            </button>[m
+[32m+[m
+[32m+[m[32m          </form>[m
+ [m
+[31m-          </div>[m
+         </div>[m
+[32m+[m
+       </div>[m
+ [m
+     </div>[m
+[32m+[m
+   </div>[m
+[31m-</div>[m
+ [m
+[31m-<script>[m
+[31m-document.addEventListener("DOMContentLoaded", function () {[m
+[31m-    const step1 = document.getElementById("step1");[m
+[31m-    const step2 = document.getElementById("step2");[m
+[31m-    const stepLabel = document.getElementById("stepLabel");[m
+[31m-    const btnNext = document.getElementById("btnNext");[m
+[31m-    const btnBack = document.getElementById("btnBack");[m
+[31m-[m
+[31m-    btnNext.addEventListener("click", function () {[m
+[31m-        step1.classList.remove("active");[m
+[31m-        step2.classList.add("active");[m
+[31m-        stepLabel.textContent = "Paso 2 de 2";[m
+[31m-        window.scrollTo({ top: 0, behavior: "smooth" });[m
+[31m-    });[m
+[31m-[m
+[31m-    btnBack.addEventListener("click", function () {[m
+[31m-        step2.classList.remove("active");[m
+[31m-        step1.classList.add("active");[m
+[31m-        stepLabel.textContent = "Paso 1 de 2";[m
+[31m-        window.scrollTo({ top: 0, behavior: "smooth" });[m
+[31m-    });[m
+[31m-[m
+[31m-    const marcaSelect = document.getElementById("id_marca");[m
+[31m-    const submarcaSelect = document.getElementById("id_submarca");[m
+[31m-    const anioSelect = document.getElementById("id_modelo_anio");[m
+[31m-    const catalogoSelect = document.getElementById("id_catalogo");[m
+[31m-[m
+[31m-    function resetSelect(select, placeholder) {[m
+[31m-        if (!select) return;[m
+[31m-        select.innerHTML = "";[m
+[31m-[m
+[31m-        const opt = document.createElement("option");[m
+[31m-        opt.value = "";[m
+[31m-        opt.textContent = placeholder;[m
+[31m-        select.appendChild(opt);[m
+[31m-    }[m
+[31m-[m
+[31m-    function cargarSubmarcas() {[m
+[31m-        const marcaId = marcaSelect ? marcaSelect.value : "";[m
+[31m-[m
+[31m-        resetSelect(submarcaSelect, "Selecciona submarca");[m
+[31m-        resetSelect(catalogoSelect, "Selecciona versión");[m
+[31m-[m
+[31m-        if (!marcaId) return;[m
+[31m-[m
+[31m-        fetch(`{% url 'portal:ajax_submarcas_por_marca' %}?marca_id=${marcaId}`)[m
+[31m-            .then(response => response.json())[m
+[31m-            .then(data => {[m
+[31m-                data.results.forEach(item => {[m
+[31m-                    const opt = document.createElement("option");[m
+[31m-                    opt.value = item.id;[m
+[31m-                    opt.textContent = item.nombre;[m
+[31m-                    submarcaSelect.appendChild(opt);[m
+[31m-                });[m
+[31m-            });[m
+[31m-    }[m
+[31m-[m
+[31m-    function cargarCatalogos() {[m
+[31m-        const submarcaId = submarcaSelect ? submarcaSelect.value : "";[m
+[31m-        const anio = anioSelect ? anioSelect.value : "";[m
+[31m-[m
+[31m-        resetSelect(catalogoSelect, "Selecciona versión");[m
+[31m-[m
+[31m-        if (!submarcaId) return;[m
+[31m-[m
+[31m-        let url = `{% url 'portal:ajax_catalogos_por_submarca' %}?submarca_id=${submarcaId}`;[m
+[31m-[m
+[31m-        if (anio) {[m
+[31m-            url += `&anio=${anio}`;[m
+[31m-        }[m
+[31m-[m
+[31m-        fetch(url)[m
+[31m-            .then(response => response.json())[m
+[31m-            .then(data => {[m
+[31m-                if (!data.results.length) {[m
+[31m-                    const opt = document.createElement("option");[m
+[31m-                    opt.value = "";[m
+[31m-                    opt.textContent = "No hay versiones para esta selección";[m
+[31m-                    catalogoSelect.appendChild(opt);[m
+[31m-                    return;[m
+[31m-                }[m
+[31m-[m
+[31m-                data.results.forEach(item => {[m
+[31m-                    const opt = document.createElement("option");[m
+[31m-                    opt.value = item.id;[m
+[31m-                    opt.textContent = item.label;[m
+[31m-                    catalogoSelect.appendChild(opt);[m
+[31m-                });[m
+[31m-            });[m
+[31m-    }[m
+[31m-[m
+[31m-    if (marcaSelect) {[m
+[31m-        marcaSelect.addEventListener("change", cargarSubmarcas);[m
+[31m-    }[m
+[31m-[m
+[31m-    if (submarcaSelect) {[m
+[31m-        submarcaSelect.addEventListener("change", cargarCatalogos);[m
+[31m-    }[m
+[31m-[m
+[31m-    if (anioSelect) {[m
+[31m-        anioSelect.addEventListener("change", cargarCatalogos);[m
+[31m-    }[m
+[31m-});[m
+[31m-</script>[m
+[32m+[m[32m</div>[m
+ [m
+ {% endblock %}[m

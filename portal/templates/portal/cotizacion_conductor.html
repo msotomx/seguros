@@ -1,0 +1,145 @@
+{% extends "portal/base.html" %}
+
+{% block title %}
+Datos del conductor
+{% endblock %}
+
+{% block content %}
+
+<div class="py-4">
+
+  <div class="row justify-content-center">
+
+    <div class="col-lg-8 col-xl-7">
+
+      <div class="text-center mb-4">
+        <span class="badge text-bg-primary mb-2">
+          Paso 3
+        </span>
+
+        <h1 class="fw-bold mb-2">
+          Datos del conductor
+        </h1>
+
+        <p class="text-muted mb-0">
+          Completa la información necesaria
+          para continuar con la emisión.
+        </p>
+      </div>
+
+      <div class="card shadow-sm border-0">
+
+        <div class="card-body p-4 p-lg-5">
+
+          <form method="post">
+            {% csrf_token %}
+
+            {% if form.errors %}
+              <div class="alert alert-danger">
+                <strong>
+                  Revisa la información capturada.
+                </strong>
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+
+              <div class="col-12">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.nombre.id_for_label }}"
+                >
+                  Nombre(s) *
+                </label>
+
+                {{ form.nombre }}
+                {{ form.nombre.errors }}
+              </div>
+
+              <div class="col-md-6">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.apellido_paterno.id_for_label }}"
+                >
+                  Apellido paterno *
+                </label>
+
+                {{ form.apellido_paterno }}
+                {{ form.apellido_paterno.errors }}
+              </div>
+
+              <div class="col-md-6">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.apellido_materno.id_for_label }}"
+                >
+                  Apellido materno *
+                </label>
+
+                {{ form.apellido_materno }}
+                {{ form.apellido_materno.errors }}
+              </div>
+
+              <div class="col-md-6">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.rfc.id_for_label }}"
+                >
+                  RFC *
+                </label>
+
+                {{ form.rfc }}
+                {{ form.rfc.errors }}
+              </div>
+
+              <div class="col-md-6">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.curp.id_for_label }}"
+                >
+                  CURP *
+                </label>
+
+                {{ form.curp }}
+                {{ form.curp.errors }}
+              </div>
+
+              <div class="col-md-6">
+                <label
+                  class="form-label fw-semibold"
+                  for="{{ form.fecha_nacimiento.id_for_label }}"
+                >
+                  Fecha de nacimiento *
+                </label>
+
+                {{ form.fecha_nacimiento }}
+                {{ form.fecha_nacimiento.errors }}
+              </div>
+
+              <div class="col-12 mt-4">
+
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-lg w-100"
+                >
+                  Siguiente
+                  <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+
+              </div>
+
+            </div>
+
+          </form>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}

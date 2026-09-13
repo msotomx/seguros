@@ -6,14 +6,13 @@ from django.utils import timezone
 from django.views import View
 
 from autos.models import Vehiculo
-from cotizador.models import (
-    Cotizacion,
-    CotizacionItem,
-    CotizacionItemCalculo,
-)
+
 from crm.models import Cliente, CodigoPostal
 from portal.forms_public import CotizacionPublicaForm
-from tarifas.services.rating_engine import RatingEngine
+from cotizador.models import Cotizacion
+from cotizador.services.portal_multi_provider_quote_service import (
+    PortalMultiProviderQuoteService,
+)
 
 
 class PortalCotizarCreateView(View):
@@ -65,6 +64,7 @@ class PortalCotizarCreateView(View):
         cliente.telefono_principal = d["telefono"]
         cliente.tipo_cliente = Cliente.TipoCliente.PERSONA
         cliente.codigo_postal = d["codigo_postal"]
+        cliente.genero = d["genero"]
 
         cp = (
             CodigoPostal.objects
@@ -142,41 +142,22 @@ class PortalCotizarCreateView(View):
         )
 
         # =====================================================
-        # Motor actual de tarifas
-        #
-        # Por ahora lo conservamos.
-        # En el siguiente paso será reemplazado/encapsulado
-        # por el nuevo QuoteService.
+        # Motor de tarifas
         # =====================================================
 
-        engine = RatingEngine()
+        items = PortalMultiProviderQuoteService.quote(
+            cotizacion=cot,
+            ambiente="SIT",
+            ramo="AUTOS",
+        )
 
-        results = engine.quote(cot)
-
-        for r in results:
-            item = CotizacionItem.objects.create(
-                cotizacion=cot,
-                aseguradora_id=r.aseguradora_id,
-                producto_id=r.producto_id,
-
-                prima_neta=r.prima_neta,
-                derechos=r.derechos,
-                recargos=r.recargos,
-                descuentos=r.descuentos,
-                iva=r.iva,
-                prima_total=r.prima_total,
-
-                forma_pago=r.forma_pago,
-                meses=r.meses,
-                ranking=r.ranking,
-                seleccionada=False,
-            )
-
-            CotizacionItemCalculo.objects.create(
-                item=item,
-                prima_base=r.prima_base,
-                factor_total=r.factor_total,
-                detalle_json=r.detalle_json or {},
+        if not items:
+            messages.warning(
+                request,
+                (
+                    "No encontramos opciones disponibles "
+                    "para los datos capturados."
+                ),
             )
 
         # =====================================================
@@ -190,7 +171,10 @@ class PortalCotizarCreateView(View):
             "¡Listo! Aquí está el resumen de tu solicitud.",
         )
 
-        return redirect("portal:cotizar_resumen")
+        return redirect(
+            "portal:cotizacion_opciones",
+            pk=cot.pk,
+        )
 
 
 from django.shortcuts import get_object_or_404, redirect

@@ -30,6 +30,7 @@ from integrations.providers.chubb.contracts import (
     ChubbVehicleUse,
     ChubbCountrySubdivision,
     ChubbMunicipality,
+    ChubbSuburb,
 )
 from integrations.providers.exceptions import (
     ProviderConfigurationError,
@@ -868,5 +869,27 @@ class ChubbCatalogClient:
         )
 
         return ChubbCatalogMapper.map_municipalities(
+            payload
+        )
+
+    def suburbs(
+        self,
+        *,
+        zip_code: str,
+    ) -> tuple[ChubbSuburb, ...]:
+
+        zip_code = self._required_text(
+            zip_code,
+            field_name="ZipCode",
+        )
+
+        payload = self._get_catalog(
+            "/catalogs/locations/suburbs",
+            params={
+                "ZipCode": zip_code,
+            },
+        )
+
+        return ChubbCatalogMapper.map_suburbs(
             payload
         )
