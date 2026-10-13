@@ -87,6 +87,16 @@ class QuoteService:
                     message=str(exc) or exc.__class__.__name__,
                     error_type=exc.__class__.__name__,
                     retryable=self._is_retryable(exc),
+                    status_code=getattr(
+                        exc,
+                        "status_code",
+                        None,
+                    ),
+                    response_data=getattr(
+                        exc,
+                        "response_data",
+                        None,
+                    ),
                 ),
             )
 

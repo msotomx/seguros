@@ -212,6 +212,52 @@ class ChubbHttpClientTest(SimpleTestCase):
             str(context.exception),
         )
 
+    def test_http_error_preserves_response_data(self):
+        response = Mock()
+        response.ok = False
+        response.status_code = 500
+        response.json.return_value = {
+            "responseData": None,
+            "messages": [
+                {
+                    "message": "Dato inválido",
+                    "messageCode": 1004,
+                    "messageType": 2,
+                }
+            ],
+        }
+
+        self.session.request.return_value = response
+
+        with self.assertRaises(
+            ProviderHttpResponseError
+        ) as context:
+            self.client.post(
+                "/quote",
+                token=self.token,
+                payload={},
+            )
+
+        error = context.exception
+
+        self.assertEqual(
+            error.status_code,
+            500,
+        )
+        self.assertEqual(
+            error.response_data,
+            {
+                "responseData": None,
+                "messages": [
+                    {
+                        "message": "Dato inválido",
+                        "messageCode": 1004,
+                        "messageType": 2,
+                    }
+                ],
+            },
+        )
+
     def test_invalid_json_is_rejected(self):
         response = Mock()
         response.ok = True

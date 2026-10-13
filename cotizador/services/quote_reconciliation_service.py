@@ -31,6 +31,7 @@ class QuoteReconciliationService:
         cotizacion: Cotizacion,
         result: QuoteResult,
         elapsed_ms: int = 0,
+        provider_configuration_id: int | None = None,
         request_json: Mapping[str, Any] | None = None,
         persistence_service=QuotePersistenceService,
     ) -> CotizacionProveedor:
@@ -64,5 +65,6 @@ class QuoteReconciliationService:
         return persistence_service.persist(
             cotizacion=cotizacion,
             attempt=attempt,
+            provider_configuration_id=provider_configuration_id,
             request_json=request_json,
         )

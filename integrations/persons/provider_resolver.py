@@ -14,6 +14,7 @@ class PersonProviderBuilder(Protocol):
         *,
         ambiente: str,
         ramo: str,
+        configuration=None,
     ) -> PersonProvider:
         ...
 
@@ -66,6 +67,7 @@ class PersonProviderResolver:
         provider_code: str,
         ambiente: str,
         ramo: str,
+        configuration=None,
     ) -> PersonProvider:
         code = self._normalize_code(
             provider_code
@@ -82,6 +84,7 @@ class PersonProviderResolver:
         provider = builder.build(
             ambiente=ambiente,
             ramo=ramo,
+            configuration=configuration,
         )
 
         returned_code = self._normalize_code(

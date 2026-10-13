@@ -28,13 +28,13 @@ class ChubbPersonClient:
     """
 
     provider_code = "CHUBB"
-
     def __init__(
         self,
         *,
         ambiente: str,
         ramo: str,
         configuration_service=ProviderConfigurationService,
+        configuration=None,
         auth_client=None,
         http_client=None,
     ):
@@ -42,19 +42,23 @@ class ChubbPersonClient:
         self.ramo = ramo.strip()
         self.configuration_service = configuration_service
 
-        self.configuration = (
-            self.configuration_service.get_active(
-                provider=self.provider_code,
-                ambiente=self.ambiente,
-                ramo=self.ramo,
+        if configuration is None:
+            configuration = (
+                self.configuration_service.get_active(
+                    provider=self.provider_code,
+                    ambiente=self.ambiente,
+                    ramo=self.ramo,
+                )
             )
-        )
+
+        self.configuration = configuration
 
         self.auth_client = auth_client or ChubbAuthClient(
             provider=self.provider_code,
             ambiente=self.ambiente,
             ramo=self.ramo,
             configuration_service=self.configuration_service,
+            configuration=self.configuration,
         )
 
         if http_client is not None:

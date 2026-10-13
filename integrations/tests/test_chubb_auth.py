@@ -88,6 +88,47 @@ class ChubbAuthClientTest(SimpleTestCase):
             timeout=20,
         )
 
+    def test_uses_explicit_configuration_without_get_active(self):
+        response = Mock()
+        response.ok = True
+        response.status_code = 200
+        response.json.return_value = {
+            "token_type": "Bearer",
+            "expires_in": "3599",
+            "access_token": "explicit-token",
+        }
+
+        self.session.post.return_value = response
+        self.configuration_service.reset_mock()
+
+        client = ChubbAuthClient(
+            provider="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=self.configuration_service,
+            session=self.session,
+            configuration=self.configuration,
+        )
+
+        token = client.get_token()
+
+        self.assertEqual(
+            token.access_token,
+            "explicit-token",
+        )
+
+        self.configuration_service.get_active.assert_not_called()
+
+        self.session.post.assert_called_once_with(
+            self.configuration.token_url,
+            headers={
+                "App_id": "test-app-id",
+                "App_key": "test-app-key",
+                "Resource": "test-resource",
+                "apiVersion": "1",
+            },
+            timeout=20,
+        )
 
     def test_rejects_http_error(self):
         response = Mock()

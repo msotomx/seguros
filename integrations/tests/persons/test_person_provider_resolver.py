@@ -40,6 +40,7 @@ class PersonProviderResolverTests(
         builder.build.assert_called_once_with(
             ambiente="SIT",
             ramo="AUTOS",
+            configuration=None,
         )
 
     def test_build_rechaza_provider_no_registrado(
@@ -87,3 +88,38 @@ class PersonProviderResolverTests(
                 ambiente="SIT",
                 ramo="AUTOS",
             )
+
+    def test_build_propagates_explicit_configuration(
+        self,
+    ):
+        configuration = Mock()
+
+        provider = Mock()
+        provider.provider_code = "CHUBB"
+
+        builder = Mock()
+        builder.build.return_value = provider
+
+        resolver = PersonProviderResolver(
+            builders={
+                "CHUBB": builder,
+            },
+        )
+
+        result = resolver.build(
+            provider_code="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=configuration,
+        )
+
+        builder.build.assert_called_once_with(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=configuration,
+        )
+
+        self.assertIs(
+            result,
+            provider,
+        )

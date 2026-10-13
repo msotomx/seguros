@@ -76,6 +76,8 @@ class CotizacionQuoteService:
             cotizacion=cotizacion,
             provider_code=configuration.provider,
             request=request,
+            provider_configuration_id=configuration.id,
             request_json=request_json,
         )
+
 

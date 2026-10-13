@@ -14,6 +14,12 @@ from integrations.providers.chubb.person_client import (
 from integrations.providers.exceptions import (
     ProviderInvalidResponseError,
 )
+from integrations.catalog.exceptions import (
+    ProviderCatalogMappingNotFoundError,
+)
+from integrations.providers.chubb.suburb_sync_service import (
+    ChubbSuburbSyncService,
+)
 
 
 class ChubbPersonProvider:
@@ -41,23 +47,45 @@ class ChubbPersonProvider:
         client: ChubbPersonClient,
         request_mapper: ChubbInternalPersonRequestMapper,
         catalog_service=CatalogService,
+        catalog_client=None,
+        suburb_sync_service=ChubbSuburbSyncService,
     ) -> None:
         self._provider_id = provider_id
         self._client = client
         self._request_mapper = request_mapper
         self._catalog_service = catalog_service
+        self._catalog_client = catalog_client
+        self._suburb_sync_service = suburb_sync_service
 
     def create_person(
         self,
         request: PersonRequest,
     ) -> PersonResult:
-        provider_suburb = self._catalog_service.to_provider(
-            provider_id=self._provider_id,
-            catalog_code=self.suburb_catalog_code,
-            internal_code=(
-                request.address.neighborhood_code
-            ),
-        )
+        try:
+            provider_suburb = self._catalog_service.to_provider(
+                provider_id=self._provider_id,
+                catalog_code=self.suburb_catalog_code,
+                internal_code=(
+                    request.address.neighborhood_code
+                ),
+            )
+        except ProviderCatalogMappingNotFoundError:
+            if self._catalog_client is None:
+                raise
+
+            self._suburb_sync_service.sync(
+                provider_id=self._provider_id,
+                zip_code=request.address.postal_code,
+                catalog_client=self._catalog_client,
+            )
+
+            provider_suburb = self._catalog_service.to_provider(
+                provider_id=self._provider_id,
+                catalog_code=self.suburb_catalog_code,
+                internal_code=(
+                    request.address.neighborhood_code
+                ),
+            )
 
         neighborhood_id = self._neighborhood_id(
             provider_suburb.external_code

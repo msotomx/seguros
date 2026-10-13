@@ -32,6 +32,20 @@ from crm.models import (
     Direccion,
 )
 from portal.forms_emision import CotizacionVehiculoForm
+from polizas.models import Poliza
+from cotizador.services.portal_document_application_service import (
+    PortalDocumentApplicationService,
+)
+from integrations.providers.exceptions import (
+    ProviderHttpTimeoutError,
+)
+from finanzas.models import Pago
+from decimal import Decimal
+from cotizador.services.policy_preparation_service import (
+    PolicyPreparationService,
+)
+from finanzas.services.pagos import crear_plan_pagos
+
 
 class CotizacionPublicaFormTests(TestCase):
     def setUp(self):
@@ -422,6 +436,105 @@ class PortalCotizarCreateViewTests(TestCase):
             Cotizacion.Tipo.INDIVIDUAL,
         )
 
+    # nuevo **
+    @patch(
+        "portal.views.cotizar."
+        "PortalMultiProviderQuoteService.quote"
+    )
+    def test_post_muestra_sin_opciones_si_no_hay_fallos(
+        self,
+        mock_quote,
+    ):
+        mock_quote.return_value = ()
+
+        response = self.client.post(
+            reverse("portal:cotizar"),
+            data=self._post_data(),
+            follow=True,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        messages_list = [
+            str(message)
+            for message in response.context["messages"]
+        ]
+
+        self.assertIn(
+            (
+                "No encontramos opciones disponibles "
+                "para los datos capturados."
+            ),
+            messages_list,
+        )
+
+        self.assertNotIn(
+            (
+                "No fue posible obtener cotizaciones "
+                "de una o más aseguradoras. "
+                "Intenta nuevamente más tarde."
+            ),
+            messages_list,
+        )
+
+    @patch(
+        "portal.views.cotizar."
+        "PortalMultiProviderQuoteService.quote"
+    )
+    def test_post_muestra_error_si_falla_proveedor(
+        self,
+        mock_quote,
+    ):
+        def quote_with_failure(*, cotizacion, **kwargs):
+            CotizacionProveedor.objects.create(
+                cotizacion=cotizacion,
+                provider_code="TEST_PROVIDER",
+                success=False,
+                elapsed_ms=100,
+                error_type="ProviderHttpResponseError",
+                error_message="Error técnico de prueba.",
+            )
+            return ()
+
+        mock_quote.side_effect = quote_with_failure
+
+        response = self.client.post(
+            reverse("portal:cotizar"),
+            data=self._post_data(),
+            follow=True,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        messages_list = [
+            str(message)
+            for message in response.context["messages"]
+        ]
+
+        self.assertIn(
+            (
+                "No fue posible obtener cotizaciones "
+                "de una o más aseguradoras. "
+                "Intenta nuevamente más tarde."
+            ),
+            messages_list,
+        )
+
+        self.assertNotIn(
+            (
+                "No encontramos opciones disponibles "
+                "para los datos capturados."
+            ),
+            messages_list,
+        )
+
+
 class PortalCotizacionOpcionesViewTests(TestCase):
 
     def setUp(self):
@@ -576,6 +689,24 @@ class PortalCotizacionOpcionesViewTests(TestCase):
             self.cotizacion.id
         )
         session.save()
+
+    def _set_direccion_contacto_valida(self):
+        direccion = Direccion.objects.create(
+            calle="Av. Tecnologico",
+            num_ext="1234",
+            colonia="Centro",
+            ciudad="Ciudad Juarez",
+            estado="Chihuahua",
+            cp="32500",
+        )
+
+        self.cliente.direccion_contacto = direccion
+        self.cliente.save(
+            update_fields=[
+                "direccion_contacto",
+                "updated_at",
+            ]
+        )
 
     def test_muestra_opcion_con_coberturas(self):
         self._set_public_session()
@@ -1231,6 +1362,451 @@ class PortalCotizacionOpcionesViewTests(TestCase):
             "20398.28",
         )
 
+        self.assertContains(
+            response,
+            "Emitir póliza",
+        )
+
+        self.assertContains(
+            response,
+            'method="post"',
+        )
+
+        self.assertContains(
+            response,
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        self.assertContains(
+            response,
+            "csrfmiddlewaretoken",
+        )
+
+        self.assertNotContains(
+            response,
+            "Emisión en integración",
+        )
+
+    @patch(
+        "portal.views.cotizacion_emision."
+        "crear_checkout_pago"
+    )
+    def test_resumen_emision_post_prepara_poliza_y_checkout(
+        self,
+        mock_crear_checkout,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+
+        self.cotizacion.conductor_apellido_paterno = "Soto"
+        self.cotizacion.conductor_apellido_materno = "Lopez"
+        self.cotizacion.conductor_rfc = "SOLM800101ABC"
+        self.cotizacion.conductor_fecha_nacimiento = date(
+            1980,
+            1,
+            1,
+        )
+        self.cotizacion.save(
+            update_fields=[
+                "conductor_apellido_paterno",
+                "conductor_apellido_materno",
+                "conductor_rfc",
+                "conductor_fecha_nacimiento",
+            ]
+        )
+
+        self.vehiculo.placas = "ABC123"
+        self.vehiculo.vin = "JH4KA3277KC007500"
+        self.vehiculo.save(
+            update_fields=[
+                "placas",
+                "vin",
+            ]
+        )
+
+        self._set_direccion_contacto_valida()
+
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        mock_crear_checkout.return_value = {
+            "ok": True,
+            "pago_id": 1,
+            "provider": "MERCADOPAGO",
+            "provider_preference_id": "PREF-123",
+            "checkout_url": "https://checkout.example.com/test",
+        }
+
+        response = self.client.post(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        poliza = Poliza.objects.get(
+            cotizacion_item=self.item,
+        )
+
+        self.assertEqual(
+            poliza.estatus,
+            Poliza.Estatus.EN_PROCESO,
+        )
+
+        pago = Pago.objects.get(
+            poliza=poliza,
+        )
+
+        self.assertEqual(
+            pago.estatus,
+            Pago.Estatus.PENDIENTE,
+        )
+        self.assertEqual(
+            pago.monto,
+            Decimal("20398.28"),
+        )
+
+        mock_crear_checkout.assert_called_once()
+
+        args, kwargs = (
+            mock_crear_checkout.call_args
+        )
+
+        self.assertEqual(
+            kwargs["pago"].id,
+            pago.id,
+        )
+        self.assertIs(
+            kwargs["request"],
+            response.wsgi_request,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+        self.assertEqual(
+            response.url,
+            "https://checkout.example.com/test",
+        )
+
+    @patch(
+        "portal.views.cotizacion_emision."
+        "crear_checkout_pago"
+    )
+    def test_resumen_emision_post_reutiliza_poliza_y_pago_existentes(
+        self,
+        mock_crear_checkout,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+
+        self.cotizacion.conductor_apellido_paterno = "Soto"
+        self.cotizacion.conductor_apellido_materno = "Lopez"
+        self.cotizacion.conductor_rfc = "SOLM800101ABC"
+        self.cotizacion.conductor_fecha_nacimiento = date(
+            1980,
+            1,
+            1,
+        )
+        self.cotizacion.save(
+            update_fields=[
+                "conductor_apellido_paterno",
+                "conductor_apellido_materno",
+                "conductor_rfc",
+                "conductor_fecha_nacimiento",
+            ]
+        )
+
+        self.vehiculo.placas = "ABC123"
+        self.vehiculo.vin = "JH4KA3277KC007500"
+        self.vehiculo.save(
+            update_fields=[
+                "placas",
+                "vin",
+            ]
+        )
+
+        self._set_direccion_contacto_valida()
+
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        poliza = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        crear_plan_pagos(
+            poliza,
+            overwrite=False,
+        )
+
+        pago = Pago.objects.get(
+            poliza=poliza,
+        )
+
+        mock_crear_checkout.return_value = {
+            "ok": True,
+            "pago_id": pago.id,
+            "provider": "MERCADOPAGO",
+            "provider_preference_id": "PREF-EXISTING",
+            "checkout_url": "https://checkout.example.com/existing",
+        }
+
+        response = self.client.post(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        self.assertEqual(
+            Poliza.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+        self.assertEqual(
+            Pago.objects.filter(
+                poliza=poliza,
+            ).count(),
+            1,
+        )
+
+        mock_crear_checkout.assert_called_once()
+
+        args, kwargs = mock_crear_checkout.call_args
+
+        self.assertEqual(
+            kwargs["pago"].id,
+            pago.id,
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+        self.assertEqual(
+            response.url,
+            "https://checkout.example.com/existing",
+        )
+
+    @patch(
+        "portal.views.cotizacion_emision."
+        "PortalIssueApplicationService.issue_one"
+    )
+    def test_resumen_emision_post_no_emite_si_faltan_datos_vehiculo(
+        self,
+        mock_issue_one,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+        self._set_direccion_contacto_valida()
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        # El setUp deja placas y VIN vacíos.
+        response = self.client.post(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        mock_issue_one.assert_not_called()
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "portal:cotizacion_vehiculo",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+    @patch(
+        "portal.views.cotizacion_emision."
+        "PortalIssueApplicationService.issue_one"
+    )
+    def test_resumen_emision_post_no_emite_si_falta_direccion(
+        self,
+        mock_issue_one,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+
+        self.vehiculo.placas = "ABC123"
+        self.vehiculo.vin = "JH4KA3277KC007500"
+        self.vehiculo.save(
+            update_fields=[
+                "placas",
+                "vin",
+            ]
+        )
+
+        self.cliente.direccion_contacto = None
+        self.cliente.save(
+            update_fields=["direccion_contacto"]
+        )
+
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        response = self.client.post(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        mock_issue_one.assert_not_called()
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "portal:cotizacion_direccion",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+    @patch(
+        "portal.views.cotizacion_emision."
+        "PortalIssueApplicationService.issue_one"
+    )
+    def test_resumen_emision_post_no_emite_si_faltan_datos_conductor(
+        self,
+        mock_issue_one,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+
+        self.vehiculo.placas = "ABC123"
+        self.vehiculo.vin = "JH4KA3277KC007500"
+        self.vehiculo.save(
+            update_fields=[
+                "placas",
+                "vin",
+            ]
+        )
+        direccion = Direccion.objects.create(
+            calle="Av. Tecnologico",
+            num_ext="1234",
+            colonia="Centro",
+            ciudad="Ciudad Juarez",
+            estado="Chihuahua",
+            cp="32500",
+        )
+
+        self.cliente.direccion_contacto = direccion
+        self.cliente.save(
+            update_fields=[
+                "direccion_contacto",
+                "updated_at",
+            ]
+        )
+
+        self.cotizacion.conductor_apellido_paterno = ""
+        self.cotizacion.conductor_rfc = ""
+        self.cotizacion.conductor_fecha_nacimiento = None
+        self.cotizacion.save(
+            update_fields=[
+                "conductor_apellido_paterno",
+                "conductor_rfc",
+                "conductor_fecha_nacimiento",
+            ]
+        )
+
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        response = self.client.post(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
+        mock_issue_one.assert_not_called()
+
+        self.assertEqual(
+            response.status_code,
+            302,
+        )
+
+        self.assertEqual(
+            response.url,
+            reverse(
+                "portal:cotizacion_conductor",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            ),
+        )
+
     def test_conductor_post_normaliza_curp_a_mayusculas(
         self,
     ):
@@ -1276,6 +1852,87 @@ class PortalCotizacionOpcionesViewTests(TestCase):
             "SOLM800101HCHXXX00",
         )
 
+    def test_resumen_emision_no_muestra_boton_si_ya_existe_poliza(
+        self,
+    ):
+        self._set_public_session()
+
+        self.item.seleccionada = True
+        self.item.save(
+            update_fields=["seleccionada"]
+        )
+
+        session = self.client.session
+        session[
+            "cotizacion_item_seleccionado_id"
+        ] = self.item.id
+        session.save()
+
+        self._set_direccion_contacto_valida()
+
+        self.cotizacion.conductor_apellido_paterno = "Soto"
+        self.cotizacion.conductor_rfc = "SOLM800101ABC"
+        self.cotizacion.conductor_fecha_nacimiento = date(
+            1980,
+            1,
+            1,
+        )
+        self.cotizacion.save(
+            update_fields=[
+                "conductor_apellido_paterno",
+                "conductor_rfc",
+                "conductor_fecha_nacimiento",
+            ]
+        )
+
+        self.vehiculo.placas = "ABC123"
+        self.vehiculo.vin = "JH4KA3277KC007500"
+        self.vehiculo.save(
+            update_fields=[
+                "placas",
+                "vin",
+            ]
+        )
+
+        Poliza.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            cotizacion_item=self.item,
+            numero_poliza="TEST-123",
+            vigencia_desde=self.cotizacion.vigencia_desde,
+            vigencia_hasta=self.cotizacion.vigencia_hasta,
+            forma_pago="CONTADO",
+            prima_total="20398.28",
+        )
+
+        response = self.client.get(
+            reverse(
+                "portal:cotizacion_resumen_emision",
+                kwargs={
+                    "pk": self.cotizacion.pk,
+                },
+            )
+        )
+
+        self.assertEqual(
+            response.status_code,
+            200,
+        )
+
+        self.assertNotContains(
+            response,
+            ">Emitir póliza<",
+            html=True,
+        )
+
+        self.assertContains(
+            response,
+            "Póliza emitida",
+        )
+
+
 class CotizacionVehiculoFormTests(TestCase):
 
     def test_vin_mayor_a_17_caracteres_es_invalido(self):
@@ -1288,3 +1945,4 @@ class CotizacionVehiculoFormTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn("vin", form.errors)
+

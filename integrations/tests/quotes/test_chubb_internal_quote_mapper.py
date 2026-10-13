@@ -76,6 +76,7 @@ class ChubbInternalQuoteRequestMapperTests(TestCase):
                     discounts=(
                         QuoteDiscountRequest(
                             code="110",
+                            name="Descuento prueba",
                             percentage=Decimal("10.00"),
                         ),
                     ),
@@ -129,6 +130,20 @@ class ChubbInternalQuoteRequestMapperTests(TestCase):
         self.assertEqual(
             coverage.deductible_type_id,
             102,
+        )
+        discount = result.items[0].discounts[0]
+
+        self.assertEqual(
+            discount.discount_type_id,
+            110,
+        )
+        self.assertEqual(
+            discount.discount_tag,
+            "Descuento prueba",
+        )
+        self.assertEqual(
+            discount.discount_percentage,
+            10.0,
         )
 
     def test_create_quote_rejects_unconfigured_gender(self):

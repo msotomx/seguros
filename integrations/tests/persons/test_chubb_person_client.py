@@ -286,3 +286,54 @@ class ChubbPersonClientTests(SimpleTestCase):
             context.exception.__cause__,
             mapper_error,
         )
+
+    def test_uses_explicit_configuration_without_get_active(
+        self,
+    ):
+        self.configuration_service.reset_mock()
+
+        client = ChubbPersonClient(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=(
+                self.configuration_service
+            ),
+            configuration=self.configuration,
+            auth_client=self.auth_client,
+            http_client=self.http_client,
+        )
+
+        self.assertIs(
+            client.configuration,
+            self.configuration,
+        )
+
+        self.configuration_service.get_active.assert_not_called()
+
+    @patch(
+        "integrations.providers.chubb.person_client."
+        "ChubbAuthClient"
+    )
+    def test_passes_explicit_configuration_to_auth_client(
+        self,
+        auth_client_class,
+    ):
+        self.configuration_service.reset_mock()
+
+        ChubbPersonClient(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=self.configuration_service,
+            configuration=self.configuration,
+            http_client=self.http_client,
+        )
+
+        self.configuration_service.get_active.assert_not_called()
+
+        auth_client_class.assert_called_once_with(
+            provider="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=self.configuration_service,
+            configuration=self.configuration,
+        )

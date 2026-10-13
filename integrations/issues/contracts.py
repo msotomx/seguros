@@ -131,6 +131,7 @@ class IssueProviderError:
     message: str
     error_type: str
     retryable: bool = False
+    outcome_unknown: bool = False
 
 
 @dataclass(frozen=True, slots=True)

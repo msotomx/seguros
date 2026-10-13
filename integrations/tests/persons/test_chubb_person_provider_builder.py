@@ -61,6 +61,11 @@ class ChubbPersonProviderBuilderTests(TestCase):
             return_value=self.client
         )
 
+        self.catalog_client = Mock()
+        self.catalog_client_factory = Mock(
+            return_value=self.catalog_client
+        )
+
         self.request_mapper = Mock()
         self.mapper_factory = Mock(
             return_value=self.request_mapper
@@ -76,8 +81,27 @@ class ChubbPersonProviderBuilderTests(TestCase):
                 self.configuration_service
             ),
             client_factory=self.client_factory,
+            catalog_client_factory=self.catalog_client_factory,
             mapper_factory=self.mapper_factory,
             provider_factory=self.provider_factory,
+        )
+
+    def test_build_constructs_catalog_client_with_exact_configuration(
+        self,
+    ):
+        self.builder.build(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=self.configuration,
+        )
+
+        self.catalog_client_factory.assert_called_once_with(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=(
+                self.configuration_service
+            ),
+            configuration=self.configuration,
         )
 
     def test_build_loads_active_chubb_configuration(
@@ -129,6 +153,7 @@ class ChubbPersonProviderBuilderTests(TestCase):
             configuration_service=(
                 self.configuration_service
             ),
+            configuration=self.configuration,
         )
 
     def test_build_constructs_provider_with_configuration_id(
@@ -138,11 +163,11 @@ class ChubbPersonProviderBuilderTests(TestCase):
             ambiente="SIT",
             ramo="AUTOS",
         )
-
         self.provider_factory.assert_called_once_with(
             provider_id=1,
             client=self.client,
             request_mapper=self.request_mapper,
+            catalog_client=self.catalog_client,
         )
 
         self.assertIs(result, self.provider)
@@ -308,3 +333,35 @@ class ChubbPersonProviderBuilderTests(TestCase):
 
         self.mapper_factory.assert_not_called()
         self.client_factory.assert_not_called()
+
+    def test_build_uses_explicit_configuration_without_get_active(
+        self,
+    ):
+        result = self.builder.build(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=self.configuration,
+        )
+
+        self.configuration_service.get_active.assert_not_called()
+
+        self.client_factory.assert_called_once_with(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=(
+                self.configuration_service
+            ),
+            configuration=self.configuration,
+        )
+
+        self.provider_factory.assert_called_once_with(
+            provider_id=1,
+            client=self.client,
+            request_mapper=self.request_mapper,
+            catalog_client=self.catalog_client,
+        )
+
+        self.assertIs(
+            result,
+            self.provider,
+        )

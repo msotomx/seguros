@@ -245,3 +245,56 @@ class PolizaEvento(models.Model):
     def __str__(self):
         return f"{self.poliza_id} {self.tipo} {self.created_at:%Y-%m-%d %H:%M}"
 
+class PolizaProveedor(TimeStampedModel):
+    poliza = models.OneToOneField(
+        Poliza,
+        on_delete=models.CASCADE,
+        related_name="resultado_proveedor",
+    )
+
+    provider_code = models.CharField(
+        max_length=30,
+        db_index=True,
+    )
+
+    provider_policy_id = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    provider_policy_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    currency = models.CharField(
+        max_length=10,
+        blank=True,
+        default="",
+    )
+
+    raw_response = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "provider_code",
+                    "provider_policy_id",
+                ],
+                name="uq_poliza_provider_policy",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=[
+                    "provider_code",
+                    "provider_policy_id",
+                ],
+            ),
+        ]

@@ -143,6 +143,9 @@ class IssueServiceTests(TestCase):
             "No fue posible emitir",
             attempt.error.message,
         )
+        self.assertFalse(
+            attempt.error.outcome_unknown
+        )
 
     def test_timeout_is_retryable(self):
         service = IssueService(
@@ -206,3 +209,23 @@ class IssueServiceTests(TestCase):
                 "CHUBB",
                 request={},
             )
+
+    def test_timeout_is_retryable_and_outcome_is_unknown(self):
+        service = IssueService(
+            [TimeoutProvider()]
+        )
+
+        attempt = service.issue_one(
+            "GNP",
+            request={},
+        )
+
+        self.assertFalse(
+            attempt.success
+        )
+        self.assertTrue(
+            attempt.error.retryable
+        )
+        self.assertTrue(
+            attempt.error.outcome_unknown
+        )

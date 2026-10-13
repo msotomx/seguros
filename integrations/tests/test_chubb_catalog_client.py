@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
@@ -4016,6 +4016,34 @@ class ChubbCatalogClientTest(SimpleTestCase):
                         rate_id=400,
                         use_id=1,
                     )
+
+    @patch(
+        "integrations.providers.chubb.catalog_client."
+        "ChubbAuthClient"
+    )
+    def test_uses_explicit_configuration_and_passes_it_to_auth(
+        self,
+        auth_client_class,
+    ):
+        self.configuration_service.reset_mock()
+
+        ChubbCatalogClient(
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=self.configuration_service,
+            configuration=self.configuration,
+            http_client=self.http_client,
+        )
+
+        self.configuration_service.get_active.assert_not_called()
+
+        auth_client_class.assert_called_once_with(
+            provider="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration_service=self.configuration_service,
+            configuration=self.configuration,
+        )
 
 from types import SimpleNamespace
 from unittest.mock import Mock

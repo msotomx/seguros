@@ -18,6 +18,9 @@ from integrations.providers.chubb.person_client import (
 from integrations.providers.chubb.person_provider import (
     ChubbPersonProvider,
 )
+from integrations.providers.chubb.catalog_client import (
+    ChubbCatalogClient,
+)
 
 
 class ChubbPersonProviderBuilder:
@@ -43,11 +46,13 @@ class ChubbPersonProviderBuilder:
         *,
         configuration_service=ProviderConfigurationService,
         client_factory=ChubbPersonClient,
+        catalog_client_factory=ChubbCatalogClient,
         mapper_factory=ChubbInternalPersonRequestMapper,
         provider_factory=ChubbPersonProvider,
     ) -> None:
         self._configuration_service = configuration_service
         self._client_factory = client_factory
+        self._catalog_client_factory = catalog_client_factory
         self._mapper_factory = mapper_factory
         self._provider_factory = provider_factory
 
@@ -56,14 +61,16 @@ class ChubbPersonProviderBuilder:
         *,
         ambiente: str,
         ramo: str,
+        configuration=None,
     ) -> ChubbPersonProvider:
-        configuration = (
-            self._configuration_service.get_active(
-                provider=self.provider_code,
-                ambiente=ambiente,
-                ramo=ramo,
+        if configuration is None:
+            configuration = (
+                self._configuration_service.get_active(
+                    provider=self.provider_code,
+                    ambiente=ambiente,
+                    ramo=ramo,
+                )
             )
-        )
 
         if not configuration.supports_issue:
             raise InvalidProviderSetting(
@@ -121,12 +128,21 @@ class ChubbPersonProviderBuilder:
             configuration_service=(
                 self._configuration_service
             ),
+            configuration=configuration,
+        )
+
+        catalog_client = self._catalog_client_factory(
+            ambiente=ambiente,
+            ramo=ramo,
+            configuration_service=self._configuration_service,
+            configuration=configuration,
         )
 
         return self._provider_factory(
             provider_id=provider_id,
             client=client,
             request_mapper=request_mapper,
+            catalog_client=catalog_client,
         )
 
     @staticmethod

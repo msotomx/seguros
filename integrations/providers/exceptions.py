@@ -32,6 +32,17 @@ class ProviderHttpConnectionError(ProviderHttpError):
 class ProviderHttpResponseError(ProviderHttpError):
     """El provider devolvió una respuesta HTTP no exitosa."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        response_data=None,
+    ):
+        super().__init__(message)
+        self.status_code = status_code
+        self.response_data = response_data
+
 
 class ProviderInvalidResponseError(ProviderHttpError):
     """El provider devolvió una respuesta inválida."""

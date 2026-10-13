@@ -60,6 +60,37 @@ class ProviderConfigurationService:
         )
 
     @classmethod
+    def get_by_id(
+        cls,
+        configuration_id: int,
+    ) -> ProviderConfiguration:
+        if not isinstance(configuration_id, int) or configuration_id <= 0:
+            raise ValueError(
+                "configuration_id debe ser un entero positivo."
+            )
+
+        config_model = (
+            AseguradoraConfiguracion.objects
+            .select_related("aseguradora")
+            .prefetch_related("settings")
+            .filter(
+                id=configuration_id,
+                activo=True,
+            )
+            .first()
+        )
+
+        if not config_model:
+            raise ProviderConfigurationNotFound(
+                "No existe configuración activa para "
+                f"id={configuration_id}."
+            )
+
+        return cls._to_configuration(
+            config_model
+        )
+
+    @classmethod
     def _build_settings(
         cls,
         config_model: AseguradoraConfiguracion,
@@ -113,34 +144,6 @@ class ProviderConfigurationService:
 
         raise InvalidProviderSetting(
             f"Tipo no soportado para '{setting.key}': {value_type}"
-        )
-
-    @classmethod
-    def list_active_for_quote(
-        cls,
-        *,
-        ambiente: str = AseguradoraConfiguracion.Ambiente.SIT,
-        ramo: str = AseguradoraConfiguracion.Ramo.AUTOS,
-    ) -> tuple[ProviderConfiguration, ...]:
-
-        config_models = (
-            AseguradoraConfiguracion.objects
-            .prefetch_related("settings")
-            .filter(
-                ambiente=ambiente,
-                ramo=ramo,
-                activo=True,
-                supports_quote=True,
-            )
-            .order_by(
-                "prioridad",
-                "id",
-            )
-        )
-
-        return tuple(
-            cls._to_configuration(config_model)
-            for config_model in config_models
         )
 
     @classmethod

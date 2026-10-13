@@ -10,6 +10,9 @@ from integrations.configuration.services import (
 from integrations.models import (
     AseguradoraConfiguracion,
 )
+from integrations.configuration.exceptions import (
+    ProviderConfigurationNotFound,
+)
 
 
 class ProviderConfigurationServiceTests(TestCase):
@@ -176,3 +179,62 @@ class ProviderConfigurationServiceTests(TestCase):
         self.assertTrue(
             configuration.supports_quote,
         )
+
+    def test_get_by_id_devuelve_configuracion_activa(self):
+        configuration = (
+            ProviderConfigurationService.get_by_id(
+                self.chubb_config.id,
+            )
+        )
+
+        self.assertEqual(
+            configuration.id,
+            self.chubb_config.id,
+        )
+
+        self.assertEqual(
+            configuration.provider,
+            "CHUBB",
+        )
+
+        self.assertEqual(
+            configuration.aseguradora_id,
+            self.chubb.id,
+        )
+
+        self.assertEqual(
+            configuration.producto_seguro_id,
+            self.chubb_producto.id,
+        )
+
+    def test_get_by_id_rechaza_id_invalido(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "configuration_id debe ser un entero positivo",
+        ):
+            ProviderConfigurationService.get_by_id(0)
+
+    def test_get_by_id_no_devuelve_configuracion_inactiva(self):
+        self.chubb_config.activo = False
+        self.chubb_config.save(
+            update_fields=["activo"],
+        )
+
+        with self.assertRaises(Exception):
+            ProviderConfigurationService.get_by_id(
+                self.chubb_config.id,
+            )
+
+    def test_get_by_id_no_devuelve_configuracion_inactiva(self):
+        self.chubb_config.activo = False
+        self.chubb_config.save(
+            update_fields=["activo"],
+        )
+
+        with self.assertRaises(
+            ProviderConfigurationNotFound,
+        ):
+            ProviderConfigurationService.get_by_id(
+                self.chubb_config.id,
+            )
+

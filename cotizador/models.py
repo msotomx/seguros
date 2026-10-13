@@ -379,6 +379,12 @@ class CotizacionProveedor(TimeStampedModel):
         default=False,
     )
 
+    provider_configuration_id = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
     class Meta:
         indexes = [
             models.Index(
@@ -386,6 +392,94 @@ class CotizacionProveedor(TimeStampedModel):
             ),
             models.Index(
                 fields=["provider_code", "success"]
+            ),
+        ]
+
+
+class CotizacionProveedorEmision(TimeStampedModel):
+    class Estatus(models.TextChoices):
+        FALLIDA = "FALLIDA", "Fallida"
+        INDETERMINADA = "INDETERMINADA", "Indeterminada"
+        EXITOSA = "EXITOSA", "Exitosa"
+        EN_PROCESO = "EN_PROCESO", "En proceso"
+        
+    cotizacion_item = models.ForeignKey(
+        "CotizacionItem",
+        on_delete=models.CASCADE,
+        related_name="emisiones_proveedor",
+    )
+
+    cotizacion_proveedor = models.ForeignKey(
+        "CotizacionProveedor",
+        on_delete=models.PROTECT,
+        related_name="emisiones",
+    )
+
+    provider_code = models.CharField(
+        max_length=30,
+        db_index=True,
+    )
+
+    provider_configuration_id = models.PositiveBigIntegerField(
+        db_index=True,
+    )
+
+    estatus = models.CharField(
+        max_length=20,
+        choices=Estatus.choices,
+        db_index=True,
+    )
+
+    elapsed_ms = models.PositiveIntegerField(
+        default=0,
+    )
+
+    retryable = models.BooleanField(
+        default=False,
+    )
+
+    outcome_unknown = models.BooleanField(
+        default=False,
+        db_index=True,
+    )
+
+    error_type = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    error_message = models.TextField(
+        blank=True,
+        default="",
+    )
+
+    provider_policy_id = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    provider_policy_key = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    response_json = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=[
+                    "cotizacion_item",
+                    "estatus",
+                ]
             ),
         ]
 

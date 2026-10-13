@@ -33,19 +33,24 @@ class ChubbAuthClient:
         ramo: str,
         configuration_service: Any = ProviderConfigurationService,
         session: requests.Session | None = None,
+        configuration=None,
     ):
         self.provider = provider
         self.ambiente = ambiente
         self.ramo = ramo
         self.configuration_service = configuration_service
         self.session = session or requests.Session()
+        self.configuration = configuration
 
     def get_token(self) -> ChubbAccessToken:
-        configuration = self.configuration_service.get_active(
-            provider=self.provider,
-            ambiente=self.ambiente,
-            ramo=self.ramo,
-        )
+        configuration = self.configuration
+
+        if configuration is None:
+            configuration = self.configuration_service.get_active(
+                provider=self.provider,
+                ambiente=self.ambiente,
+                ramo=self.ramo,
+            )
 
         self._validate_configuration(configuration)
 

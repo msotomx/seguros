@@ -20,6 +20,9 @@ from integrations.providers.chubb.person_provider import (
 from integrations.providers.exceptions import (
     ProviderInvalidResponseError,
 )
+from integrations.catalog.exceptions import (
+    ProviderCatalogMappingNotFoundError,
+)
 
 
 def _person_request() -> PersonRequest:
@@ -53,12 +56,16 @@ class ChubbPersonProviderTests(SimpleTestCase):
         self.client = Mock()
         self.request_mapper = Mock()
         self.catalog_service = Mock()
+        self.catalog_client = Mock()
+        self.suburb_sync_service = Mock()
 
         self.provider = ChubbPersonProvider(
             provider_id=self.provider_id,
             client=self.client,
             request_mapper=self.request_mapper,
             catalog_service=self.catalog_service,
+            catalog_client=self.catalog_client,
+            suburb_sync_service=self.suburb_sync_service,
         )
 
         self.request = _person_request()
@@ -86,6 +93,50 @@ class ChubbPersonProviderTests(SimpleTestCase):
                 "personId": 18683522,
                 "addressId": 1410484013,
             },
+        )
+
+    def test_create_person_syncs_suburbs_and_retries_when_mapping_missing(
+        self,
+    ):
+        self.catalog_service.to_provider.side_effect = [
+            ProviderCatalogMappingNotFoundError(
+                "No existe mapping SUBURB."
+            ),
+            self.provider_suburb,
+        ]
+        self.request_mapper.create_person.return_value = (
+            self.chubb_request
+        )
+        self.client.create_person.return_value = (
+            self.chubb_result
+        )
+
+        result = self.provider.create_person(
+            self.request
+        )
+
+        self.suburb_sync_service.sync.assert_called_once_with(
+            provider_id=self.provider_id,
+            zip_code="32500",
+            catalog_client=self.catalog_client,
+        )
+
+        self.assertEqual(
+            self.catalog_service.to_provider.call_count,
+            2,
+        )
+
+        self.request_mapper.create_person.assert_called_once_with(
+            request=self.request,
+            neighborhood_id=13083,
+        )
+        self.client.create_person.assert_called_once_with(
+            self.chubb_request
+        )
+
+        self.assertEqual(
+            result.provider_person_id,
+            "18683522",
         )
 
     def test_create_person_resolves_suburb_for_provider(

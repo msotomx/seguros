@@ -15,9 +15,6 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
 
     def setUp(self):
         self.mapper = ChubbInternalIssueRequestMapper(
-            payment_type_ids={
-                "CONTADO": 12,
-            },
             legal_personality_ids={
                 "FISICA": 21,
             },
@@ -80,7 +77,8 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
 
     def test_issue_maps_internal_request_to_chubb_contract(self):
         result = self.mapper.issue(
-            self.request
+            self.request,
+            payment_type_id=12,
         )
 
         self.assertEqual(
@@ -186,7 +184,8 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
         )
 
         result = self.mapper.issue(
-            request
+            request,
+            payment_type_id=12,
         )
 
         self.assertEqual(
@@ -194,23 +193,15 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
             12,
         )
 
-    def test_issue_rejects_unconfigured_payment_method(self):
-        request = InternalIssueRequest(
-            provider_quote_id=self.request.provider_quote_id,
-            provider_quote_version_id=(
-                self.request.provider_quote_version_id
-            ),
-            payment_method_code="MENSUAL",
-            insured=self.request.insured,
-            risks=self.request.risks,
-            invoice=self.request.invoice,
-        )
-
+    def test_issue_rejects_invalid_payment_type_id(self):
         with self.assertRaisesRegex(
             ValueError,
-            "Forma de pago no configurada",
+            "payment_type_id",
         ):
-            self.mapper.issue(request)
+            self.mapper.issue(
+                self.request,
+                payment_type_id=0,
+            )
 
     def test_issue_rejects_invalid_provider_person_id(self):
         request = InternalIssueRequest(
@@ -232,7 +223,10 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
             ValueError,
             "provider_person_id",
         ):
-            self.mapper.issue(request)
+            self.mapper.issue(
+                request,
+                payment_type_id=12,
+            )
 
     def test_issue_requires_owner(self):
         risk = self.request.risks[0]
@@ -265,7 +259,10 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
             ValueError,
             "requiere propietario",
         ):
-            self.mapper.issue(request)
+            self.mapper.issue(
+                request,
+                payment_type_id=12,
+            )
 
     def test_issue_requires_beneficiary(self):
         risk = self.request.risks[0]
@@ -298,13 +295,13 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
             ValueError,
             "requiere beneficiario",
         ):
-            self.mapper.issue(request)
+            self.mapper.issue(
+                request,
+                payment_type_id=12,
+            )
 
     def test_issue_accepts_zero_legal_personality_id(self):
         mapper = ChubbInternalIssueRequestMapper(
-            payment_type_ids={
-                "CONTADO": 12,
-            },
             legal_personality_ids={
                 "FISICA": 0,
             },
@@ -317,7 +314,8 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
         )
 
         result = mapper.issue(
-            self.request
+            self.request,
+            payment_type_id=12,
         )
 
         self.assertIsNotNone(
@@ -326,4 +324,33 @@ class ChubbInternalIssueRequestMapperTests(TestCase):
         self.assertEqual(
             result.invoice.legal_personality_id,
             0,
+        )
+
+    def test_issue_without_invoice_does_not_require_fiscal_mappings(
+        self,
+    ):
+        mapper = ChubbInternalIssueRequestMapper()
+
+        request = InternalIssueRequest(
+            provider_quote_id=(
+                self.request.provider_quote_id
+            ),
+            provider_quote_version_id=(
+                self.request.provider_quote_version_id
+            ),
+            payment_method_code=(
+                self.request.payment_method_code
+            ),
+            insured=self.request.insured,
+            risks=self.request.risks,
+            invoice=None,
+        )
+
+        result = mapper.issue(
+            request,
+            payment_type_id=12,
+        )
+
+        self.assertIsNone(
+            result.invoice
         )

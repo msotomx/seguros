@@ -152,13 +152,29 @@ class PortalCotizarCreateView(View):
         )
 
         if not items:
-            messages.warning(
-                request,
-                (
-                    "No encontramos opciones disponibles "
-                    "para los datos capturados."
-                ),
+            has_provider_errors = (
+                cot.resultados_proveedor
+                .filter(success=False)
+                .exists()
             )
+
+            if has_provider_errors:
+                messages.warning(
+                    request,
+                    (
+                        "No fue posible obtener cotizaciones "
+                        "de una o más aseguradoras. "
+                        "Intenta nuevamente más tarde."
+                    ),
+                )
+            else:
+                messages.warning(
+                    request,
+                    (
+                        "No encontramos opciones disponibles "
+                        "para los datos capturados."
+                    ),
+                )
 
         # =====================================================
         # Sesión pública

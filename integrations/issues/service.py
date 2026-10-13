@@ -79,6 +79,7 @@ class IssueService:
                     message=str(exc) or exc.__class__.__name__,
                     error_type=exc.__class__.__name__,
                     retryable=self._is_retryable(exc),
+                    outcome_unknown=self._is_outcome_unknown(exc),
                 ),
             )
 
@@ -145,4 +146,20 @@ class IssueService:
         return any(
             fragment in error_name
             for fragment in retryable_fragments
+        )
+
+    @staticmethod
+    def _is_outcome_unknown(
+        exc: Exception,
+    ) -> bool:
+        error_name = exc.__class__.__name__.lower()
+
+        unknown_fragments = (
+            "timeout",
+            "connection",
+        )
+
+        return any(
+            fragment in error_name
+            for fragment in unknown_fragments
         )

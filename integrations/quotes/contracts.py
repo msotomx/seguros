@@ -127,13 +127,15 @@ class QuoteProviderError:
     Error normalizado de un proveedor.
 
     No se expone directamente la excepción original a las capas
-    superiores, pero se conserva su tipo para diagnóstico.
+    superiores, pero se conserva información útil para diagnóstico.
     """
 
     provider_code: str
     message: str
     error_type: str
     retryable: bool = False
+    status_code: int | None = None
+    response_data: Any | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,8 +295,9 @@ class QuoteDiscountRequest:
 
     code: str
 
-    percentage: Decimal = Decimal("0.00")
+    name: str
 
+    percentage: Decimal = Decimal("0.00")
 
 # ==========================================================
 # Riesgo

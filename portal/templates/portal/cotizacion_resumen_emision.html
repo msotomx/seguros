@@ -313,40 +313,46 @@ Resumen de tu seguro
 
 
       <!-- EMISIÓN -->
+      {% if poliza %}
 
-      <div class="card border-primary mt-4">
+        <h5 class="fw-bold">
+          Póliza emitida
+        </h5>
 
-        <div class="card-body p-4 text-center">
+        <p class="text-muted mb-2">
+          La emisión fue procesada correctamente.
+        </p>
 
-          <h5 class="fw-bold">
-            ¿Todo está correcto?
-          </h5>
+        <div class="fw-semibold">
+          {{ poliza.numero_poliza }}
+        </div>
 
-          <p class="text-muted">
-            El siguiente paso solicitará la emisión
-            de la póliza a la aseguradora.
-          </p>
+      {% else %}
 
-          <!--
-              Todavía NO conectamos emisión.
-              No crear póliza TEMP ni marcar Cotizacion EMITIDA.
-          -->
+        <h5 class="fw-bold">
+          ¿Todo está correcto?
+        </h5>
+
+        <p class="text-muted">
+          El siguiente paso solicitará la emisión
+          de la póliza a la aseguradora.
+        </p>
+
+        <form
+          method="post"
+          action="{% url 'portal:cotizacion_resumen_emision' cotizacion.pk %}"
+        >
+          {% csrf_token %}
 
           <button
-            type="button"
+            type="submit"
             class="btn btn-primary btn-lg"
-            disabled
           >
             Emitir póliza
           </button>
+        </form>
 
-          <div class="small text-muted mt-2">
-            Emisión en integración
-          </div>
-
-        </div>
-
-      </div>
+      {% endif %}
 
     </div>
   </div>

@@ -4,21 +4,38 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q
 from django.views.generic import ListView, CreateView, DetailView
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-
-from django.shortcuts import redirect
+from django.views.generic import TemplateView
 from django.urls import reverse
 from django.http import HttpResponseForbidden
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.decorators import method_decorator
 from django.utils.timezone import localdate
+from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
+from itertools import product
 
-from ui.forms import CotizacionDatosForm
-from autos.models import Vehiculo
 from crm.models import Cliente
-from cotizador.models import Cotizacion, CotizacionItem
+from autos.models import Vehiculo, VehiculoCatalogo
+from ui.forms import VehiculoFromCatalogoForm, CotizacionDatosForm
+from cotizador.models import (
+    Cotizacion,
+    CotizacionItem,
+    CotizacionItemCalculo,
+    CotizacionItemCobertura,
+    CotizacionItemReglaAplicada,
+)
+from cotizador.services.portal_issue_application_service import (
+    PortalIssueApplicationService,
+)
+from catalogos.models import Aseguradora, ProductoSeguro
+from tarifas.services.rating_engine import RatingEngine
+from polizas.models import Poliza, PolizaEvento
+from polizas.services import generar_numero_poliza, log_poliza_event
+from portal.services import crear_acceso_portal_cliente
+from integrations.whatsapp import enviar_acceso_portal_whatsapp, WhatsAppError
+import inspect
 
 
 def _is_admin(user) -> bool:
@@ -251,15 +268,6 @@ class CotizacionWizardClienteSelectView(LoginRequiredMixin, PermissionRequiredMi
         ctx["can_create_cliente"] = self.request.user.has_perm("crm.add_cliente")
         return ctx
 
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.views.generic import TemplateView
-
-from crm.models import Cliente
-
-
 class CotizacionWizardTipoView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
     permission_required = "cotizador.add_cotizacion"
     template_name = "ui/cotizador/wizard_tipo.html"
@@ -292,16 +300,6 @@ class CotizacionWizardTipoView(LoginRequiredMixin, PermissionRequiredMixin, Temp
         cliente_id = self.request.session.get("wiz_cot_cliente_id")
         ctx["cliente"] = Cliente.objects.filter(id=cliente_id).first()
         return ctx
-
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.views.generic import TemplateView
-
-from crm.models import Cliente
-from autos.models import Vehiculo, VehiculoCatalogo
-from ui.forms import VehiculoFromCatalogoForm
 
 
 class CotizacionWizardVehiculoSelectView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
@@ -422,27 +420,6 @@ class CotizacionWizardVehiculoSelectView(LoginRequiredMixin, PermissionRequiredM
         return ctx
 
 # CALCULAR COTIZACIONES
-from decimal import Decimal
-from itertools import product
-
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required, permission_required
-from django.db import transaction
-from django.http import HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect
-from django.views.decorators.http import require_POST
-from django.urls import reverse
-
-from cotizador.models import (
-    Cotizacion,
-    CotizacionItem,
-    CotizacionItemCalculo,
-    CotizacionItemCobertura,
-    CotizacionItemReglaAplicada,
-)
-
-from catalogos.models import Aseguradora, ProductoSeguro
-from tarifas.services.rating_engine import RatingEngine
 
 @require_POST
 @login_required
@@ -570,30 +547,6 @@ def cotizacion_calcular(request, pk: int):
     messages.success(request, "Opciones calculadas correctamente.")
     return redirect("ui:cotizacion_detail", pk=cot.pk)
 
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required, permission_required
-from django.db import transaction
-from django.http import HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect
-from django.views.decorators.http import require_POST
-
-from cotizador.models import Cotizacion, CotizacionItem
-from polizas.models import Poliza
-from polizas.services import generar_numero_poliza
-
-from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required, permission_required
-from django.utils import timezone
-from django.db import transaction
-
-from polizas.models import Poliza
-from polizas.models import PolizaEvento
-from polizas.services import log_poliza_event
-from portal.services import crear_acceso_portal_cliente
-from integrations.whatsapp import enviar_acceso_portal_whatsapp, WhatsAppError
-import inspect
-
-
 @require_POST
 @login_required
 @permission_required("polizas.add_poliza", raise_exception=True)
@@ -632,44 +585,20 @@ def cotizacion_emitir_poliza(request, pk: int):
         # si luego haces PolizaDetailView, aquí redirigimos allí
         return redirect("ui:poliza_list")
 
-    #fp = selected_item.forma_pago or cot.forma_pago_preferida
-    fp = cot.forma_pago_preferida
-    
-    with transaction.atomic():
-        # número de póliza: placeholder (hasta integrar emisión real con aseguradora)
-        numero = f"TEMP-{selected_item.cotizacion.folio}"
-        prima_neta=selected_item.prima_total
-        financiamiento=Decimal(0.00)
-        gastos_expedicion=Decimal(0.00)
-        subtotal=prima_neta + financiamiento + gastos_expedicion
-        iva = subtotal * Decimal(0.16)
-        prima_total = subtotal + iva
-        poliza = Poliza.objects.create(
-            cliente=cot.cliente,
-            vehiculo=cot.vehiculo,
-            flotilla=cot.flotilla,
-            aseguradora=selected_item.aseguradora,
-            producto=selected_item.producto,
+    # Aqui conecta cotizacion a Poliza
+    try:
+        poliza = PortalIssueApplicationService.issue_one(
             cotizacion_item=selected_item,
-            numero_poliza=numero,
-            fecha_emision = None, # hasta que se emita la poliza se asigna fecha
-            vigencia_desde=cot.vigencia_desde,
-            vigencia_hasta=cot.vigencia_hasta,
-            estatus=Poliza.Estatus.EN_PROCESO,
-            prima_neta=prima_neta,
-            financiamiento=financiamiento,
-            gastos_expedicion=gastos_expedicion,
-            subtotal=subtotal,
-            iva=iva,
-            prima_total=prima_total,
-            forma_pago=fp,
-            agente=cot.owner,
         )
-
-        # Marcar la cotización como EMITIDA
-        cot.estatus = Cotizacion.Estatus.EMITIDA
-        cot.emitida_at = timezone.now()
-        cot.save(update_fields=["estatus", "emitida_at"])
+    except ValueError as exc:
+        messages.error(
+            request,
+            f"No se pudo emitir la póliza: {exc}",
+        )
+        return redirect(
+            "ui:cotizacion_detail",
+            pk=cot.pk,
+        )
 
     # Crear Usuario para el Cliente Portal
     if poliza.cotizacion_item:

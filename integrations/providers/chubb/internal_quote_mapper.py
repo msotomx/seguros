@@ -186,7 +186,7 @@ class ChubbInternalQuoteRequestMapper:
     ) -> ChubbQuoteDiscountRequest:
         return ChubbQuoteDiscountRequest(
             discount_type_id=int(discount.code),
-            discount_tag=discount.code,
+            discount_tag=discount.name,
             discount_percentage=float(
                 discount.percentage
             ),

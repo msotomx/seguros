@@ -1,4 +1,8 @@
 import json
+import hashlib
+import shutil
+import tempfile
+
 from decimal import Decimal
 from datetime import timedelta, date
 from django.db import IntegrityError
@@ -8,7 +12,7 @@ from unittest.mock import Mock
 
 from autos.models import Vehiculo, VehiculoCatalogo, Marca, SubMarca
 from crm.models import Cliente
-
+from documentos.models import Documento
 from cotizador.models import (
     Cotizacion,
     CotizacionItem,
@@ -17,12 +21,16 @@ from cotizador.models import (
     CotizacionProveedorOpcion,
     CotizacionProveedorRiesgo,
     CotizacionProveedorPersona,
+    CotizacionProveedorEmision,
 )
 from cotizador.services.quote_persistence_service import (
     QuotePersistenceService,
 )
 from cotizador.services.provider_quote_service import (
     CotizacionProviderService,
+)
+from cotizador.services.issue_reconciliation_service import (
+    IssueReconciliationService,
 )
 from integrations.quotes.contracts import (
     QuoteAttempt,
@@ -113,7 +121,34 @@ from cotizador.services.person_persistence_service import (
     PersonPersistenceService,
 )
 from cotizador.services.issue_request_service import IssueRequestService
-
+from cotizador.services.portal_issue_application_service import (
+    PortalIssueApplicationService,
+)
+from cotizador.services.issue_persistence_service import (
+    IssuePersistenceService,
+)
+from integrations.issues.contracts import IssueResult
+from polizas.models import Poliza, PolizaProveedor, PolizaEvento
+from cotizador.services.portal_document_application_service import (
+    PortalDocumentApplicationService,
+)
+from integrations.documents.contracts import (
+    PolicyDocumentRequest,
+    PolicyDocument,
+    PolicyDocumentResult,
+)
+from cotizador.services.policy_document_persistence_service import (
+    PolicyDocumentPersistenceService,
+)
+from django.test import override_settings
+from integrations.providers.exceptions import (
+    ProviderHttpTimeoutError,
+)
+from cotizador.services.policy_preparation_service import (
+    PolicyPreparationService,
+)
+from finanzas.models import Pago
+from finanzas.services.pagos import crear_plan_pagos
 
 class CotizacionConductorTests(TestCase):
     def test_guarda_datos_del_conductor(self):
@@ -246,6 +281,7 @@ class QuotePersistenceServiceTests(TestCase):
         registro = QuotePersistenceService.persist(
             cotizacion=self.cotizacion,
             attempt=attempt,
+            provider_configuration_id=123,
             request_json={
                 "reference": self.cotizacion.folio,
             },
@@ -268,7 +304,6 @@ class QuotePersistenceServiceTests(TestCase):
             registro.total_premium,
             Decimal("12500.00"),
         )
-
         self.assertEqual(
             CotizacionProveedor.objects.count(),
             1,
@@ -285,7 +320,10 @@ class QuotePersistenceServiceTests(TestCase):
             CotizacionProveedorCobertura.objects.count(),
             1,
         )
-
+        self.assertEqual(
+            registro.provider_configuration_id,
+            123,
+        )
         riesgo = registro.riesgos.get()
 
         self.assertEqual(
@@ -327,9 +365,20 @@ class QuotePersistenceServiceTests(TestCase):
     def test_persiste_intento_fallido(self):
         error = QuoteProviderError(
             provider_code="CHUBB",
-            message="Timeout consultando proveedor.",
-            error_type="TimeoutError",
-            retryable=True,
+            message="Chubb devolvió HTTP 500 para POST /quote.",
+            error_type="ProviderHttpResponseError",
+            retryable=False,
+            status_code=500,
+            response_data={
+                "responseData": None,
+                "messages": [
+                    {
+                        "message": "Dato inválido",
+                        "messageCode": 1004,
+                        "messageType": 2,
+                    }
+                ],
+            },
         )
 
         attempt = QuoteAttempt(
@@ -342,6 +391,7 @@ class QuotePersistenceServiceTests(TestCase):
         registro = QuotePersistenceService.persist(
             cotizacion=self.cotizacion,
             attempt=attempt,
+            provider_configuration_id=456,
             request_json={
                 "reference": self.cotizacion.folio,
             },
@@ -359,16 +409,19 @@ class QuotePersistenceServiceTests(TestCase):
         )
         self.assertEqual(
             registro.error_message,
-            "Timeout consultando proveedor.",
+            "Chubb devolvió HTTP 500 para POST /quote.",
         )
         self.assertEqual(
             registro.error_type,
-            "TimeoutError",
+            "ProviderHttpResponseError",
         )
-        self.assertTrue(
+        self.assertEqual(
+            registro.provider_configuration_id,
+            456,
+        )
+        self.assertFalse(
             registro.error_retryable,
         )
-
         self.assertEqual(
             registro.riesgos.count(),
             0,
@@ -376,6 +429,19 @@ class QuotePersistenceServiceTests(TestCase):
         self.assertEqual(
             registro.opciones.count(),
             0,
+        )
+        self.assertEqual(
+            registro.response_json,
+            {
+                "responseData": None,
+                "messages": [
+                    {
+                        "message": "Dato inválido",
+                        "messageCode": 1004,
+                        "messageType": 2,
+                    }
+                ],
+            },
         )
 
     def test_persiste_opciones_sin_riesgos(self):
@@ -446,6 +512,66 @@ class QuotePersistenceServiceTests(TestCase):
             opcion.total_premium,
             Decimal("8500.00"),
         )
+
+    def test_rejects_invalid_provider_configuration_id(
+        self,
+    ):
+        attempt = Mock(spec=QuoteAttempt)
+        attempt.success = True
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "provider_configuration_id debe ser",
+        ):
+            QuotePersistenceService.persist(
+                cotizacion=self.cotizacion,
+                attempt=attempt,
+                provider_configuration_id=0,
+            )
+
+    def test_rechaza_provider_configuration_id_invalido(self):
+        option = QuoteOption(
+            code="BASICA",
+            provider_package_id=None,
+            name="Básica",
+            total_premium=Decimal("8500.00"),
+            currency="MXN",
+            selected=False,
+            coverages=(),
+        )
+
+        result = QuoteResult(
+            provider_code="CHUBB",
+            provider_quote_id="Q-001",
+            provider_quote_version_id=None,
+            reference=None,
+            currency="MXN",
+            net_premium=Decimal("7000.00"),
+            fees=Decimal("300.00"),
+            taxes=Decimal("1200.00"),
+            total_premium=Decimal("8500.00"),
+            options=(option,),
+            risks=(),
+            raw_response={},
+        )
+
+        attempt = QuoteAttempt(
+            provider_code="CHUBB",
+            success=True,
+            elapsed_ms=125,
+            result=result,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "provider_configuration_id debe ser",
+        ):
+            QuotePersistenceService.persist(
+                cotizacion=self.cotizacion,
+                attempt=attempt,
+                provider_configuration_id=0,
+            )
+
 
 class CotizacionProviderServiceTests(TestCase):
 
@@ -546,6 +672,7 @@ class CotizacionProviderServiceTests(TestCase):
             cotizacion=self.cotizacion,
             provider_code="CHUBB",
             request=self.request,
+            provider_configuration_id=77,
             request_json=request_json,
         )
 
@@ -557,6 +684,7 @@ class CotizacionProviderServiceTests(TestCase):
         persistence_service.persist.assert_called_once_with(
             cotizacion=self.cotizacion,
             attempt=attempt,
+            provider_configuration_id=77,
             request_json=request_json,
         )
 
@@ -767,6 +895,110 @@ class QuoteRequestServiceTests(TestCase):
         self.assertEqual(
             risk.packages[0].coverages,
             (),
+        )
+
+    def test_construye_descuentos_desde_catalogo_proveedor(self):
+        catalog_service = Mock()
+        discount_service = Mock()
+
+        discount_service.list_internal_codes_for_provider.return_value = (
+            "DESCUENTO",
+            "BONIFICACION",
+        )
+
+        mappings = {
+            (
+                "VEHICLE",
+                f"VEHICULO_CATALOGO_{self.vehiculo_catalogo.id}",
+            ): ("01010100101", "Vehículo"),
+            (
+                "VEHICLE_USE",
+                "PARTICULAR",
+            ): ("01", "Particular"),
+            (
+                "STATE",
+                "CHIHUAHUA",
+            ): ("5", "Chihuahua"),
+            (
+                "MUNICIPALITY",
+                "JUAREZ",
+            ): ("863", "Juárez"),
+            (
+                "COVERAGE_PACKAGE",
+                "AMPLIA",
+            ): ("1", "Amplia"),
+            (
+                "DISCOUNT",
+                "DESCUENTO",
+            ): ("1", "Descuento"),
+            (
+                "DISCOUNT",
+                "BONIFICACION",
+            ): ("2", "Bonificacion"),
+        }
+
+        def to_provider(
+            *,
+            provider_id,
+            catalog_code,
+            internal_code,
+        ):
+            external_code, external_name = mappings[
+                (catalog_code, internal_code)
+            ]
+
+            return ProviderCatalogValue(
+                provider_id=provider_id,
+                catalog_code=catalog_code,
+                internal_code=internal_code,
+                internal_name=internal_code,
+                external_code=external_code,
+                external_name=external_name,
+                metadata={},
+            )
+
+        catalog_service.to_provider.side_effect = to_provider
+
+        request = QuoteRequestService.build(
+            cotizacion=self.cotizacion,
+            provider_id=1,
+            package_code="AMPLIA",
+            garage=False,
+            catalog_service=catalog_service,
+            discount_service=discount_service,
+        )
+
+        discounts = request.risks[0].discounts
+
+        self.assertEqual(
+            len(discounts),
+            2,
+        )
+
+        self.assertEqual(
+            discounts[0].code,
+            "1",
+        )
+        self.assertEqual(
+            discounts[0].name,
+            "Descuento",
+        )
+        self.assertEqual(
+            discounts[0].percentage,
+            Decimal("0.00"),
+        )
+
+        self.assertEqual(
+            discounts[1].code,
+            "2",
+        )
+        self.assertEqual(
+            discounts[1].name,
+            "Bonificacion",
+        )
+        self.assertEqual(
+            discounts[1].percentage,
+            Decimal("0.00"),
         )
 
     def test_serializa_internal_quote_request_para_json(self):
@@ -993,6 +1225,7 @@ class CotizacionQuoteServiceTests(TestCase):
             cotizacion=self.cotizacion,
             provider_code="CHUBB",
             request=request,
+            provider_configuration_id=1,
             request_json={
                 "reference": self.cotizacion.folio,
             },
@@ -1543,6 +1776,7 @@ class CotizacionChubbIntegrationTests(TestCase):
         registro = QuoteReconciliationService.persist_result(
             cotizacion=self.cotizacion,
             result=result,
+            provider_configuration_id=88,
         )
 
         self.assertTrue(registro.success)
@@ -1560,6 +1794,10 @@ class CotizacionChubbIntegrationTests(TestCase):
         self.assertEqual(
             registro.riesgos.count(),
             1,
+        )
+        self.assertEqual(
+            registro.provider_configuration_id,
+            88,
         )
 
         riesgo = registro.riesgos.get()
@@ -3025,6 +3263,7 @@ class IssueRequestServiceTests(TestCase):
             CotizacionProveedor.objects.create(
                 cotizacion=self.cotizacion,
                 provider_code="CHUBB",
+                provider_configuration_id=77,
                 success=True,
                 elapsed_ms=100,
                 provider_quote_id="2061261215",
@@ -3212,4 +3451,2583 @@ class IssueRequestServiceTests(TestCase):
         ):
             IssueRequestService.build(
                 cotizacion_item=self.item,
+            )
+
+class PortalIssueApplicationServiceTests(TestCase):
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(
+            tipo_cliente=Cliente.TipoCliente.PERSONA,
+            nombre="Miguel",
+            email_principal="miguel@example.com",
+        )
+
+        self.vehiculo = Vehiculo.objects.create(
+            cliente=self.cliente,
+            marca_texto="ACURA",
+            submarca_texto="TL",
+            modelo_anio=2015,
+            version="SEDAN 3.7L AUT",
+            placas="TR543",
+            vin="JH4KA3277KC007500",
+        )
+
+        hoy = timezone.localdate()
+
+        self.cotizacion = Cotizacion.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            flotilla=None,
+            tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+            vigencia_desde=hoy,
+            vigencia_hasta=hoy + timedelta(days=365),
+            forma_pago_preferida="CONTADO",
+        )
+
+        self.provider_quote = (
+            CotizacionProveedor.objects.create(
+                cotizacion=self.cotizacion,
+                provider_code="CHUBB",
+                provider_configuration_id=77,
+                success=True,
+                elapsed_ms=100,
+                provider_quote_id="2061261215",
+                provider_quote_version_id="2061499999",
+                currency="MXN",
+                total_premium=Decimal("41582.77"),
+            )
+        )
+
+        self.provider_risk = (
+            CotizacionProveedorRiesgo.objects.create(
+                cotizacion_proveedor=self.provider_quote,
+                provider_risk_id="2061426582",
+                risk_number=1,
+                vehicle_key="01010100101",
+            )
+        )
+
+        self.provider_option = (
+            CotizacionProveedorOpcion.objects.create(
+                cotizacion_proveedor=self.provider_quote,
+                riesgo=self.provider_risk,
+                code="1",
+                provider_package_id="1",
+                name="AMPLIA",
+                total_premium=Decimal("41582.77"),
+                currency="MXN",
+                selected=True,
+            )
+        )
+
+        self.aseguradora = Aseguradora.objects.create(
+            nombre="Chubb Issue Application Test",
+        )
+
+        self.producto = ProductoSeguro.objects.create(
+            aseguradora=self.aseguradora,
+            nombre_producto="Autos",
+            tipo_producto=ProductoSeguro.TipoProducto.AUTO,
+            modelo_calculo=ProductoSeguro.ModeloCalculo.SIMPLE,
+        )
+
+        self.item = CotizacionItem.objects.create(
+            cotizacion=self.cotizacion,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            provider_option=self.provider_option,
+            prima_neta=Decimal("35247.21"),
+            derechos=Decimal("600.00"),
+            iva=Decimal("5735.56"),
+            prima_total=Decimal("41582.77"),
+            forma_pago="CONTADO",
+            provider="CHUBB",
+            provider_quote_id="2061261215",
+            paquete_nombre="AMPLIA",
+        )
+
+        self.person = (
+            CotizacionProveedorPersona.objects.create(
+                cotizacion=self.cotizacion,
+                provider_code="CHUBB",
+                rol=(
+                    CotizacionProveedorPersona
+                    .Rol
+                    .ASEGURADO
+                ),
+                provider_tran_id="57482667",
+                provider_person_id="18683522",
+                provider_address_id="1410484013",
+                raw_response={
+                    "success": True,
+                },
+            )
+        )
+
+        self.configuration_service = Mock()
+
+        self.configuration = Mock()
+        self.configuration.provider = "CHUBB"
+        self.configuration.ambiente = "SIT"
+        self.configuration.ramo = "AUTOS"
+
+        self.configuration_service.get_by_id.return_value = (
+            self.configuration
+        )
+
+        self.resolver_factory = Mock()
+        self.resolver = Mock()
+
+        self.provider = Mock()
+        self.provider.provider_code = "CHUBB"
+
+        self.resolver_factory.return_value = self.resolver
+        self.resolver.build.return_value = self.provider
+
+        self.request_service = Mock()
+        self.request = Mock()
+
+        self.request_service.build.return_value = (
+            self.request
+        )
+
+        self.issue_service_factory = Mock()
+        self.issue_service = Mock()
+
+        self.issue_service_factory.return_value = (
+            self.issue_service
+        )
+
+        self.persistence_service = Mock()
+        self.persisted_policy = Mock()
+
+        self.persistence_service.save.return_value = (
+            self.persisted_policy
+        )
+        self.attempt_persistence_service = Mock()
+
+    def test_issue_one_coordinates_complete_issue_flow(
+        self,
+    ):
+        expected_result = Mock()
+
+        attempt = Mock()
+        attempt.success = True
+        attempt.result = expected_result
+        attempt.error = None
+
+        self.issue_service.issue_one.return_value = (
+            attempt
+        )
+
+        result = PortalIssueApplicationService.issue_one(
+            cotizacion_item=self.item,
+            configuration_service=(
+                self.configuration_service
+            ),
+            resolver_factory=self.resolver_factory,
+            request_service=self.request_service,
+            issue_service_factory=(
+                self.issue_service_factory
+            ),
+            persistence_service=self.persistence_service,
+            attempt_persistence_service=(
+                self.attempt_persistence_service
+            ),            
+        )
+
+        self.configuration_service.get_by_id.assert_called_once_with(
+            77,
+        )
+
+        self.resolver_factory.assert_called_once_with(
+            configuration_service=(
+                self.configuration_service
+            ),
+        )
+
+        self.resolver.build.assert_called_once_with(
+            provider_code="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=self.configuration,
+        )
+
+        self.request_service.build.assert_called_once_with(
+            cotizacion_item=self.item,
+        )
+
+        self.issue_service_factory.assert_called_once_with(
+            providers=[self.provider],
+        )
+
+        self.issue_service.issue_one.assert_called_once_with(
+            "CHUBB",
+            self.request,
+        )
+
+        self.attempt_persistence_service.save.assert_called_once_with(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            attempt=attempt,
+        )
+
+        self.persistence_service.save.assert_called_once_with(
+            cotizacion_item=self.item,
+            issue_result=expected_result,
+        )
+
+        self.assertIs(
+            result,
+            self.persisted_policy,
+        )
+
+
+    def test_issue_one_raises_when_issue_attempt_fails(
+        self,
+    ):
+        error = Mock()
+        error.message = "Error de emisión."
+        error.error_type = "ProviderInvalidResponseError"
+        error.retryable = False
+        error.outcome_unknown = False
+
+        attempt = Mock()
+        attempt.success = False
+        attempt.result = None
+        attempt.error = error
+
+        self.issue_service.issue_one.return_value = (
+            attempt
+        )
+
+        with self.assertLogs(
+            "cotizador.services.portal_issue_application_service",
+            level="ERROR",
+        ) as logs:
+            with self.assertRaisesRegex(
+                ValueError,
+                "Error de emisión",
+            ):
+                PortalIssueApplicationService.issue_one(
+                    cotizacion_item=self.item,
+                    configuration_service=(
+                        self.configuration_service
+                    ),
+                    resolver_factory=self.resolver_factory,
+                    request_service=self.request_service,
+                    issue_service_factory=(
+                        self.issue_service_factory
+                    ),
+                    persistence_service=(
+                        self.persistence_service
+                    ),
+                    attempt_persistence_service=(
+                        self.attempt_persistence_service
+                    ),
+                )
+
+        self.persistence_service.save.assert_not_called()
+        self.attempt_persistence_service.save.assert_called_once_with(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            attempt=attempt,
+        )
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn(
+            "cotizacion_id="
+            f"{self.cotizacion.id}",
+            logs.output[0],
+        )
+        self.assertIn(
+            "cotizacion_item_id="
+            f"{self.item.id}",
+            logs.output[0],
+        )
+        self.assertIn(
+            "provider=CHUBB",
+            logs.output[0],
+        )
+        self.assertIn(
+            "error_type=ProviderInvalidResponseError",
+            logs.output[0],
+        )
+        self.assertIn(
+            "retryable=False",
+            logs.output[0],
+        )
+        self.assertIn(
+            "message=Error de emisión.",
+            logs.output[0],
+        )
+
+    def test_issue_one_identifies_unknown_outcome(
+        self,
+    ):
+        error = Mock()
+        error.message = (
+            "Chubb excedió el timeout de 30 segundos "
+            "para POST /issue."
+        )
+        error.error_type = "ProviderHttpTimeoutError"
+        error.retryable = True
+        error.outcome_unknown = True
+
+        attempt = Mock()
+        attempt.success = False
+        attempt.result = None
+        attempt.error = error
+
+        self.issue_service.issue_one.return_value = (
+            attempt
+        )
+
+        with self.assertLogs(
+            "cotizador.services.portal_issue_application_service",
+            level="ERROR",
+        ) as logs:
+            with self.assertRaises(ValueError):
+                PortalIssueApplicationService.issue_one(
+                    cotizacion_item=self.item,
+                    configuration_service=(
+                        self.configuration_service
+                    ),
+                    resolver_factory=self.resolver_factory,
+                    request_service=self.request_service,
+                    issue_service_factory=(
+                        self.issue_service_factory
+                    ),
+                    persistence_service=(
+                        self.persistence_service
+                    ),
+                    attempt_persistence_service=(
+                        self.attempt_persistence_service
+                    ),                    
+                )
+
+        self.persistence_service.save.assert_not_called()
+
+        self.attempt_persistence_service.save.assert_called_once_with(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            attempt=attempt,
+        )
+
+        self.assertEqual(
+            len(logs.output),
+            1,
+        )
+        self.assertIn(
+            "outcome_unknown=True",
+            logs.output[0],
+        )
+
+    def test_issue_one_blocks_when_unknown_issue_exists(
+        self,
+    ):
+        CotizacionProveedorEmision.objects.create(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_code="CHUBB",
+            provider_configuration_id=77,
+            estatus=(
+                CotizacionProveedorEmision
+                .Estatus
+                .INDETERMINADA
+            ),
+            elapsed_ms=30000,
+            retryable=True,
+            outcome_unknown=True,
+            error_type="ProviderHttpTimeoutError",
+            error_message="Timeout durante /issue.",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "requiere reconciliación",
+        ):
+            PortalIssueApplicationService.issue_one(
+                cotizacion_item=self.item,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                request_service=self.request_service,
+                issue_service_factory=(
+                    self.issue_service_factory
+                ),
+                persistence_service=(
+                    self.persistence_service
+                ),
+                attempt_persistence_service=(
+                    self.attempt_persistence_service
+                ),
+            )
+
+        self.issue_service.issue_one.assert_not_called()
+        self.persistence_service.save.assert_not_called()
+        self.attempt_persistence_service.save.assert_not_called()
+
+    def test_issue_one_requires_provider(
+        self,
+    ):
+        self.item.provider = ""
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no tiene provider",
+        ):
+            PortalIssueApplicationService.issue_one(
+                cotizacion_item=self.item,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                request_service=self.request_service,
+                issue_service_factory=(
+                    self.issue_service_factory
+                ),
+                persistence_service=self.persistence_service,
+            )
+
+        self.configuration_service.get_by_id.assert_not_called()
+
+    def test_issue_one_requires_provider_configuration_id(
+        self,
+    ):
+        self.provider_quote.provider_configuration_id = None
+        self.provider_quote.save(
+            update_fields=["provider_configuration_id"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no tiene provider_configuration_id",
+        ):
+            PortalIssueApplicationService.issue_one(
+                cotizacion_item=self.item,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                request_service=self.request_service,
+                issue_service_factory=(
+                    self.issue_service_factory
+                ),
+                persistence_service=self.persistence_service,
+            )
+
+        self.configuration_service.get_by_id.assert_not_called()
+
+    def test_issue_one_rejects_provider_mismatch(
+        self,
+    ):
+        self.provider_quote.provider_code = "OTRO"
+        self.provider_quote.save(
+            update_fields=["provider_code"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no corresponde al provider",
+        ):
+            PortalIssueApplicationService.issue_one(
+                cotizacion_item=self.item,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                request_service=self.request_service,
+                issue_service_factory=(
+                    self.issue_service_factory
+                ),
+                persistence_service=self.persistence_service,
+            )
+
+        self.configuration_service.get_by_id.assert_not_called()
+
+    def test_issue_one_creates_insured_person_when_missing(
+        self,
+    ):
+        self.person.delete()
+
+        person_resolver_factory = Mock()
+        person_resolver = Mock()
+        person_provider = Mock()
+        person_provider.provider_code = "CHUBB"
+
+        person_resolver_factory.return_value = (
+            person_resolver
+        )
+        person_resolver.build.return_value = (
+            person_provider
+        )
+
+        person_service = Mock()
+
+        expected_result = Mock()
+
+        attempt = Mock()
+        attempt.success = True
+        attempt.result = expected_result
+        attempt.error = None
+
+        self.issue_service.issue_one.return_value = (
+            attempt
+        )
+
+        PortalIssueApplicationService.issue_one(
+            cotizacion_item=self.item,
+            configuration_service=(
+                self.configuration_service
+            ),
+            resolver_factory=self.resolver_factory,
+            request_service=self.request_service,
+            issue_service_factory=(
+                self.issue_service_factory
+            ),
+            persistence_service=self.persistence_service,
+            person_resolver_factory=(
+                person_resolver_factory
+            ),
+            person_service=person_service,
+            attempt_persistence_service=(
+                self.attempt_persistence_service
+            ),            
+        )
+
+        self.configuration_service.get_by_id.assert_called_once_with(
+            77,
+        )
+
+        person_resolver_factory.assert_called_once_with()
+
+        person_resolver.build.assert_called_once_with(
+            provider_code="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=self.configuration,
+        )
+
+        person_service.create_one.assert_called_once_with(
+            cotizacion=self.cotizacion,
+            configuration=self.configuration,
+            provider=person_provider,
+        )
+
+        self.request_service.build.assert_called_once_with(
+            cotizacion_item=self.item,
+        )
+
+    def test_reconcile_unknown_issue_marks_it_successful(
+        self,
+    ):
+        emision = CotizacionProveedorEmision.objects.create(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_code="CHUBB",
+            provider_configuration_id=77,
+            estatus=(
+                CotizacionProveedorEmision
+                .Estatus
+                .INDETERMINADA
+            ),
+            elapsed_ms=30000,
+            retryable=True,
+            outcome_unknown=True,
+            error_type="ProviderHttpTimeoutError",
+            error_message="Timeout durante /issue.",
+        )
+
+        issue_result = IssueResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            policy_number=None,
+            currency="MXN",
+            net_premium=Decimal("35247.21"),
+            fees=Decimal("600.00"),
+            surcharge=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            taxes=Decimal("5735.56"),
+            total_premium=Decimal("41582.77"),
+            raw_response={
+                "reconciled": True,
+            },
+        )
+
+        persistence_service = Mock()
+        expected_policy = Mock()
+
+        persistence_service.save.return_value = (
+            expected_policy
+        )
+
+        result = IssueReconciliationService.reconcile(
+            cotizacion_item=self.item,
+            emision=emision,
+            issue_result=issue_result,
+            persistence_service=persistence_service,
+        )
+
+        self.assertIs(
+            result,
+            expected_policy,
+        )
+
+        persistence_service.save.assert_called_once_with(
+            cotizacion_item=self.item,
+            issue_result=issue_result,
+        )
+
+        emision.refresh_from_db()
+
+        self.assertEqual(
+            emision.estatus,
+            CotizacionProveedorEmision.Estatus.EXITOSA,
+        )
+        self.assertFalse(
+            emision.outcome_unknown
+        )
+        self.assertFalse(
+            emision.retryable
+        )
+        self.assertEqual(
+            emision.provider_policy_id,
+            "99007704",
+        )
+        self.assertEqual(
+            emision.provider_policy_key,
+            "M6",
+        )
+
+    def test_issue_one_blocks_when_successful_issue_exists(self):
+        CotizacionProveedorEmision.objects.create(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_code="CHUBB",
+            provider_configuration_id=77,
+            estatus=CotizacionProveedorEmision.Estatus.EXITOSA,
+            elapsed_ms=1200,
+            provider_policy_id="99007664",
+            provider_policy_key="M6",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "emisión exitosa",
+        ):
+            PortalIssueApplicationService.issue_one(
+                cotizacion_item=self.item,
+                configuration_service=self.configuration_service,
+                resolver_factory=self.resolver_factory,
+                request_service=self.request_service,
+                issue_service_factory=self.issue_service_factory,
+                persistence_service=self.persistence_service,
+                attempt_persistence_service=self.attempt_persistence_service,
+            )
+
+        self.issue_service.issue_one.assert_not_called()
+        self.persistence_service.save.assert_not_called()
+        self.attempt_persistence_service.save.assert_not_called()
+
+    def test_issue_one_reserves_and_finalizes_attempt(self):
+        from unittest.mock import Mock
+
+        expected_result = Mock()
+
+        attempt = Mock()
+        attempt.success = True
+        attempt.result = expected_result
+        attempt.error = None
+
+        self.issue_service.issue_one.return_value = attempt
+
+        reservation = Mock()
+        self.attempt_persistence_service.reserve.return_value = (
+            reservation
+        )
+
+        calls = []
+
+        def reserve_side_effect(**kwargs):
+            calls.append("reserve")
+            return reservation
+
+        def issue_side_effect(*args, **kwargs):
+            calls.append("issue")
+            return attempt
+
+        def finalize_side_effect(**kwargs):
+            calls.append("finalize")
+            return reservation
+
+        def persist_side_effect(**kwargs):
+            calls.append("persist")
+            return self.persisted_policy
+
+        self.attempt_persistence_service.reserve.side_effect = (
+            reserve_side_effect
+        )
+        self.issue_service.issue_one.side_effect = (
+            issue_side_effect
+        )
+        self.attempt_persistence_service.finalize.side_effect = (
+            finalize_side_effect
+        )
+        self.persistence_service.save.side_effect = (
+            persist_side_effect
+        )
+
+        result = PortalIssueApplicationService.issue_one(
+            cotizacion_item=self.item,
+            configuration_service=self.configuration_service,
+            resolver_factory=self.resolver_factory,
+            request_service=self.request_service,
+            issue_service_factory=self.issue_service_factory,
+            persistence_service=self.persistence_service,
+            attempt_persistence_service=(
+                self.attempt_persistence_service
+            ),
+        )
+
+        self.assertEqual(
+            calls,
+            ["reserve", "issue", "finalize", "persist"],
+        )
+
+        self.attempt_persistence_service.reserve.assert_called_once_with(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            provider_code="CHUBB",
+        )
+
+        self.attempt_persistence_service.finalize.assert_called_once_with(
+            reservation=reservation,
+            attempt=attempt,
+        )
+
+        self.attempt_persistence_service.save.assert_not_called()
+
+        self.assertIs(result, self.persisted_policy)
+
+
+class IssueAttemptPersistenceServiceTests(
+    PortalIssueApplicationServiceTests
+):
+
+    def test_save_persists_successful_issue_attempt(self):
+        from integrations.issues.contracts import (
+            IssueAttempt,
+            IssueResult,
+        )
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+
+        issue_result = IssueResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007664",
+            provider_policy_key="M6",
+            policy_number="M699007664",
+            currency="MXN",
+            net_premium=Decimal("35247.21"),
+            fees=Decimal("600.00"),
+            surcharge=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            taxes=Decimal("5735.56"),
+            total_premium=Decimal("41582.77"),
+            raw_response={"success": True},
+        )
+
+        attempt = IssueAttempt(
+            provider_code="CHUBB",
+            success=True,
+            elapsed_ms=1200,
+            result=issue_result,
+        )
+
+        emission = IssueAttemptPersistenceService.save(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            attempt=attempt,
+        )
+
+        self.assertEqual(
+            emission.estatus,
+            CotizacionProveedorEmision.Estatus.EXITOSA,
+        )
+        self.assertEqual(
+            emission.provider_policy_id,
+            "99007664",
+        )
+        self.assertEqual(
+            emission.provider_policy_key,
+            "M6",
+        )
+        self.assertFalse(emission.outcome_unknown)
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_reserve_creates_in_progress_issue(self):
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+
+        emission = IssueAttemptPersistenceService.reserve(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            provider_code="CHUBB",
+        )
+
+        emission.refresh_from_db()
+
+        self.assertEqual(
+            emission.estatus,
+            CotizacionProveedorEmision.Estatus.EN_PROCESO,
+        )
+
+        self.assertEqual(
+            emission.cotizacion_item_id,
+            self.item.id,
+        )
+
+        self.assertEqual(
+            emission.cotizacion_proveedor_id,
+            self.provider_quote.id,
+        )
+
+        self.assertEqual(
+            emission.provider_configuration_id,
+            77,
+        )
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_reserve_blocks_duplicate_issue(self):
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+
+        params = {
+            "cotizacion_item": self.item,
+            "cotizacion_proveedor": self.provider_quote,
+            "provider_configuration_id": 77,
+            "provider_code": "CHUBB",
+        }
+
+        first_emission = IssueAttemptPersistenceService.reserve(
+            **params
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "Ya existe una emisión",
+        ):
+            IssueAttemptPersistenceService.reserve(
+                **params
+            )
+
+        self.assertEqual(
+            first_emission.estatus,
+            CotizacionProveedorEmision.Estatus.EN_PROCESO,
+        )
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_finalize_updates_existing_reservation(self):
+        from decimal import Decimal
+
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+        from integrations.issues.contracts import (
+            IssueAttempt,
+            IssueResult,
+        )
+
+        reservation = IssueAttemptPersistenceService.reserve(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            provider_code="CHUBB",
+        )
+
+        original_id = reservation.id
+
+        result = IssueResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007664",
+            provider_policy_key="M6",
+            policy_number="M699007664",
+            currency="MXN",
+            net_premium=Decimal("35247.21"),
+            fees=Decimal("600.00"),
+            surcharge=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            taxes=Decimal("5735.56"),
+            total_premium=Decimal("41582.77"),
+            raw_response={"success": True},
+        )
+
+        attempt = IssueAttempt(
+            provider_code="CHUBB",
+            success=True,
+            elapsed_ms=1200,
+            result=result,
+        )
+
+        emission = IssueAttemptPersistenceService.finalize(
+            reservation=reservation,
+            attempt=attempt,
+        )
+
+        emission.refresh_from_db()
+
+        self.assertEqual(emission.id, original_id)
+        self.assertEqual(
+            emission.estatus,
+            CotizacionProveedorEmision.Estatus.EXITOSA,
+        )
+        self.assertEqual(
+            emission.provider_policy_id,
+            "99007664",
+        )
+        self.assertEqual(
+            emission.provider_policy_key,
+            "M6",
+        )
+        self.assertEqual(emission.elapsed_ms, 1200)
+        self.assertFalse(emission.outcome_unknown)
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_finalize_blocks_second_finalization(self):
+        from decimal import Decimal
+
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+        from integrations.issues.contracts import (
+            IssueAttempt,
+            IssueResult,
+        )
+
+        reservation = IssueAttemptPersistenceService.reserve(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            provider_code="CHUBB",
+        )
+
+        result = IssueResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007664",
+            provider_policy_key="M6",
+            policy_number="M699007664",
+            currency="MXN",
+            net_premium=Decimal("35247.21"),
+            fees=Decimal("600.00"),
+            surcharge=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            taxes=Decimal("5735.56"),
+            total_premium=Decimal("41582.77"),
+        )
+
+        attempt = IssueAttempt(
+            provider_code="CHUBB",
+            success=True,
+            elapsed_ms=1200,
+            result=result,
+        )
+
+        IssueAttemptPersistenceService.finalize(
+            reservation=reservation,
+            attempt=attempt,
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "La reserva de emisión ya fue finalizada",
+        ):
+            IssueAttemptPersistenceService.finalize(
+                reservation=reservation,
+                attempt=attempt,
+            )
+
+        reservation.refresh_from_db()
+
+        self.assertEqual(
+            reservation.estatus,
+            CotizacionProveedorEmision.Estatus.EXITOSA,
+        )
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_finalize_marks_unknown_outcome_as_indeterminate(self):
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+        from integrations.issues.contracts import (
+            IssueAttempt,
+            IssueProviderError,
+        )
+
+        reservation = IssueAttemptPersistenceService.reserve(
+            cotizacion_item=self.item,
+            cotizacion_proveedor=self.provider_quote,
+            provider_configuration_id=77,
+            provider_code="CHUBB",
+        )
+
+        attempt = IssueAttempt(
+            provider_code="CHUBB",
+            success=False,
+            elapsed_ms=30000,
+            error=IssueProviderError(
+                provider_code="CHUBB",
+                message="Timeout esperando respuesta del proveedor",
+                error_type="TIMEOUT",
+                retryable=True,
+                outcome_unknown=True,
+            ),
+        )
+
+        emission = IssueAttemptPersistenceService.finalize(
+            reservation=reservation,
+            attempt=attempt,
+        )
+
+        self.assertEqual(
+            emission.estatus,
+            CotizacionProveedorEmision.Estatus.INDETERMINADA,
+        )
+        self.assertTrue(emission.outcome_unknown)
+        self.assertTrue(emission.retryable)
+        self.assertEqual(emission.error_type, "TIMEOUT")
+        self.assertEqual(emission.elapsed_ms, 30000)
+
+        # No debe permitir reservar otra emisión.
+        with self.assertRaisesRegex(
+            ValueError,
+            "Ya existe una emisión",
+        ):
+            IssueAttemptPersistenceService.reserve(
+                cotizacion_item=self.item,
+                cotizacion_proveedor=self.provider_quote,
+                provider_configuration_id=77,
+                provider_code="CHUBB",
+            )
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+    def test_finalize_failed_issue_allows_new_reservation(self):
+        from cotizador.services.issue_attempt_persistence_service import (
+            IssueAttemptPersistenceService,
+        )
+        from integrations.issues.contracts import (
+            IssueAttempt,
+            IssueProviderError,
+        )
+
+        params = {
+            "cotizacion_item": self.item,
+            "cotizacion_proveedor": self.provider_quote,
+            "provider_configuration_id": 77,
+            "provider_code": "CHUBB",
+        }
+
+        reservation = IssueAttemptPersistenceService.reserve(
+            **params
+        )
+
+        attempt = IssueAttempt(
+            provider_code="CHUBB",
+            success=False,
+            elapsed_ms=850,
+            error=IssueProviderError(
+                provider_code="CHUBB",
+                message="Solicitud de emisión rechazada",
+                error_type="VALIDATION_ERROR",
+                retryable=False,
+                outcome_unknown=False,
+            ),
+        )
+
+        emission = IssueAttemptPersistenceService.finalize(
+            reservation=reservation,
+            attempt=attempt,
+        )
+
+        self.assertEqual(
+            emission.estatus,
+            CotizacionProveedorEmision.Estatus.FALLIDA,
+        )
+        self.assertFalse(emission.outcome_unknown)
+        self.assertFalse(emission.retryable)
+        self.assertEqual(
+            emission.error_type,
+            "VALIDATION_ERROR",
+        )
+
+        # Una emisión fallida con resultado conocido
+        # no bloquea una nueva reserva.
+        new_reservation = IssueAttemptPersistenceService.reserve(
+            **params
+        )
+
+        self.assertNotEqual(
+            new_reservation.id,
+            reservation.id,
+        )
+
+        self.assertEqual(
+            new_reservation.estatus,
+            CotizacionProveedorEmision.Estatus.EN_PROCESO,
+        )
+
+        self.assertEqual(
+            CotizacionProveedorEmision.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            2,
+        )
+
+
+class IssuePersistenceServiceTests(TestCase):
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(
+            tipo_cliente=Cliente.TipoCliente.PERSONA,
+            nombre="Miguel",
+            email_principal="miguel@example.com",
+        )
+
+        self.vehiculo = Vehiculo.objects.create(
+            cliente=self.cliente,
+            marca_texto="ACURA",
+            submarca_texto="TL",
+            modelo_anio=2015,
+            version="SEDAN 3.7L AUT",
+            placas="TR543",
+            vin="JH4KA3277KC007500",
+        )
+
+        hoy = timezone.localdate()
+
+        self.cotizacion = Cotizacion.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            flotilla=None,
+            tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+            vigencia_desde=hoy,
+            vigencia_hasta=hoy + timedelta(days=365),
+            forma_pago_preferida="CONTADO",
+        )
+
+        self.aseguradora = Aseguradora.objects.create(
+            nombre="Chubb Persistence Test",
+        )
+
+        self.producto = ProductoSeguro.objects.create(
+            aseguradora=self.aseguradora,
+            nombre_producto="Autos",
+            tipo_producto=ProductoSeguro.TipoProducto.AUTO,
+            modelo_calculo=ProductoSeguro.ModeloCalculo.SIMPLE,
+        )
+
+        self.item = CotizacionItem.objects.create(
+            cotizacion=self.cotizacion,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            prima_neta=Decimal("35000.00"),
+            derechos=Decimal("500.00"),
+            iva=Decimal("5680.00"),
+            prima_total=Decimal("41180.00"),
+            forma_pago="CONTADO",
+            provider="CHUBB",
+            provider_quote_id="2061261215",
+            paquete_nombre="AMPLIA",
+        )
+
+    def _issue_result(
+        self,
+        *,
+        provider_code="CHUBB",
+        provider_policy_id="99007670",
+        provider_policy_key="M6",
+        policy_number=None,
+    ):
+        return IssueResult(
+            provider_code=provider_code,
+            provider_policy_id=provider_policy_id,
+            provider_policy_key=provider_policy_key,
+            policy_number=policy_number,
+            currency="MXN",
+            net_premium=Decimal("35247.21"),
+            fees=Decimal("600.00"),
+            surcharge=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            taxes=Decimal("5735.56"),
+            total_premium=Decimal("41582.77"),
+            raw_response={
+                "success": True,
+                "responseData": [
+                    {
+                        "quoteKey": "M6 ",
+                        "quotePolicyId": 99007670,
+                    },
+                ],
+            },
+        )
+
+    def test_save_creates_policy_and_provider_result(
+        self,
+    ):
+        result = self._issue_result()
+
+        poliza = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.assertEqual(
+            Poliza.objects.count(),
+            1,
+        )
+        self.assertEqual(
+            PolizaProveedor.objects.count(),
+            1,
+        )
+
+        self.assertEqual(
+            poliza.cotizacion_item,
+            self.item,
+        )
+        self.assertEqual(
+            poliza.cliente,
+            self.cotizacion.cliente,
+        )
+        self.assertEqual(
+            poliza.vehiculo,
+            self.cotizacion.vehiculo,
+        )
+        self.assertEqual(
+            poliza.aseguradora,
+            self.item.aseguradora,
+        )
+        self.assertEqual(
+            poliza.producto,
+            self.item.producto,
+        )
+
+        self.assertEqual(
+            poliza.prima_neta,
+            Decimal("35247.21"),
+        )
+        self.assertEqual(
+            poliza.gastos_expedicion,
+            Decimal("600.00"),
+        )
+        self.assertEqual(
+            poliza.financiamiento,
+            Decimal("0.00"),
+        )
+        self.assertEqual(
+            poliza.subtotal,
+            Decimal("35847.21"),
+        )
+        self.assertEqual(
+            poliza.iva,
+            Decimal("5735.56"),
+        )
+        self.assertEqual(
+            poliza.prima_total,
+            Decimal("41582.77"),
+        )
+
+        provider_result = poliza.resultado_proveedor
+
+        self.assertEqual(
+            provider_result.provider_code,
+            "CHUBB",
+        )
+        self.assertEqual(
+            provider_result.provider_policy_id,
+            "99007670",
+        )
+        self.assertEqual(
+            provider_result.provider_policy_key,
+            "M6",
+        )
+        self.assertEqual(
+            provider_result.currency,
+            "MXN",
+        )
+        self.assertEqual(
+            provider_result.raw_response,
+            result.raw_response,
+        )
+
+    def test_save_completes_prepared_policy_instead_of_creating_another(
+        self,
+    ):
+        prepared = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+        prepared_pk = prepared.pk
+
+        self.assertEqual(
+            prepared.estatus,
+            Poliza.Estatus.EN_PROCESO,
+        )
+        self.assertFalse(
+            PolizaProveedor.objects.filter(
+                poliza=prepared,
+            ).exists()
+        )
+
+        result = self._issue_result(
+            policy_number="M6 99007670",
+        )
+
+        poliza = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.assertEqual(
+            poliza.pk,
+            prepared_pk,
+        )
+        self.assertEqual(
+            Poliza.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            PolizaProveedor.objects.filter(
+                poliza=poliza,
+            ).count(),
+            1,
+        )
+
+        poliza.refresh_from_db()
+
+        self.assertEqual(
+            poliza.numero_poliza,
+            "M6 99007670",
+        )
+        self.assertIsNotNone(
+            poliza.fecha_emision,
+        )
+        self.assertEqual(
+            poliza.estatus,
+            Poliza.Estatus.EN_PROCESO,
+        )
+
+        self.assertEqual(
+            poliza.prima_neta,
+            Decimal("35247.21"),
+        )
+        self.assertEqual(
+            poliza.gastos_expedicion,
+            Decimal("600.00"),
+        )
+        self.assertEqual(
+            poliza.financiamiento,
+            Decimal("0.00"),
+        )
+        self.assertEqual(
+            poliza.subtotal,
+            Decimal("35847.21"),
+        )
+        self.assertEqual(
+            poliza.iva,
+            Decimal("5735.56"),
+        )
+        self.assertEqual(
+            poliza.prima_total,
+            Decimal("41582.77"),
+        )
+
+        provider_result = poliza.resultado_proveedor
+
+        self.assertEqual(
+            provider_result.provider_code,
+            "CHUBB",
+        )
+        self.assertEqual(
+            provider_result.provider_policy_id,
+            "99007670",
+        )
+        self.assertEqual(
+            provider_result.provider_policy_key,
+            "M6",
+        )
+        self.assertEqual(
+            provider_result.currency,
+            "MXN",
+        )
+
+        self.cotizacion.refresh_from_db()
+
+        self.assertEqual(
+            self.cotizacion.estatus,
+            Cotizacion.Estatus.EMITIDA,
+        )
+        self.assertIsNotNone(
+            self.cotizacion.emitida_at,
+        )
+
+    def test_save_marks_quote_as_issued(
+        self,
+    ):
+        result = self._issue_result()
+
+        IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.cotizacion.refresh_from_db()
+
+        self.assertEqual(
+            self.cotizacion.estatus,
+            Cotizacion.Estatus.EMITIDA,
+        )
+        self.assertIsNotNone(
+            self.cotizacion.emitida_at,
+        )
+
+    def test_save_uses_policy_number_when_provider_returns_it(
+        self,
+    ):
+        result = self._issue_result(
+            policy_number="K6 99454302",
+        )
+
+        poliza = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.assertEqual(
+            poliza.numero_poliza,
+            "K6 99454302",
+        )
+
+    def test_save_is_idempotent_for_same_provider_policy(
+        self,
+    ):
+        result = self._issue_result()
+
+        first = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        second = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.assertEqual(
+            first.pk,
+            second.pk,
+        )
+        self.assertEqual(
+            Poliza.objects.count(),
+            1,
+        )
+        self.assertEqual(
+            PolizaProveedor.objects.count(),
+            1,
+        )
+
+    def test_save_rejects_result_from_different_provider(
+        self,
+    ):
+        result = self._issue_result(
+            provider_code="OTRO",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no corresponde al CotizacionItem",
+        ):
+            IssuePersistenceService.save(
+                cotizacion_item=self.item,
+                issue_result=result,
+            )
+
+        self.assertEqual(
+            Poliza.objects.count(),
+            0,
+        )
+        self.assertEqual(
+            PolizaProveedor.objects.count(),
+            0,
+        )
+
+    def test_save_prepared_policy_logs_number_change_once(
+        self,
+    ):
+        prepared = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        previous_number = prepared.numero_poliza
+
+        result = self._issue_result(
+            policy_number="M6 99007670",
+        )
+
+        first = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        second = IssuePersistenceService.save(
+            cotizacion_item=self.item,
+            issue_result=result,
+        )
+
+        self.assertEqual(first.pk, second.pk)
+
+        events = PolizaEvento.objects.filter(
+            poliza=first,
+            tipo=PolizaEvento.Tipo.NUMERO_ACTUALIZADO,
+        )
+
+        self.assertEqual(events.count(), 1)
+
+        event = events.get()
+
+        self.assertEqual(
+            event.data["numero_anterior"],
+            previous_number,
+        )
+        self.assertEqual(
+            event.data["numero_nuevo"],
+            "M6 99007670",
+        )
+#***
+
+class PolicyPreparationServiceTests(TestCase):
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(
+            tipo_cliente=Cliente.TipoCliente.PERSONA,
+            nombre="Miguel",
+            email_principal="miguel@example.com",
+        )
+
+        self.vehiculo = Vehiculo.objects.create(
+            cliente=self.cliente,
+            marca_texto="ACURA",
+            submarca_texto="TL",
+            modelo_anio=2015,
+            version="SEDAN 3.7L AUT",
+            placas="TR543",
+            vin="JH4KA3277KC007500",
+        )
+
+        hoy = timezone.localdate()
+
+        self.cotizacion = Cotizacion.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            flotilla=None,
+            tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+            vigencia_desde=hoy,
+            vigencia_hasta=hoy + timedelta(days=365),
+            forma_pago_preferida="CONTADO",
+        )
+
+        self.aseguradora = Aseguradora.objects.create(
+            nombre="Chubb Policy Preparation Test",
+        )
+
+        self.producto = ProductoSeguro.objects.create(
+            aseguradora=self.aseguradora,
+            nombre_producto="Autos",
+            tipo_producto=ProductoSeguro.TipoProducto.AUTO,
+            modelo_calculo=ProductoSeguro.ModeloCalculo.SIMPLE,
+        )
+
+        self.item = CotizacionItem.objects.create(
+            cotizacion=self.cotizacion,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            prima_neta=Decimal("35000.00"),
+            derechos=Decimal("500.00"),
+            iva=Decimal("5680.00"),
+            prima_total=Decimal("41180.00"),
+            forma_pago="CONTADO",
+            provider="CHUBB",
+            provider_quote_id="2061261215",
+            paquete_nombre="AMPLIA",
+        )
+
+    def test_prepare_creates_policy_in_process_and_created_event(self):
+        poliza = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        self.assertEqual(
+            poliza.estatus,
+            Poliza.Estatus.EN_PROCESO,
+        )
+        self.assertEqual(
+            poliza.cotizacion_item,
+            self.item,
+        )
+        self.assertEqual(
+            poliza.cliente,
+            self.cliente,
+        )
+        self.assertEqual(
+            poliza.vehiculo,
+            self.vehiculo,
+        )
+        self.assertEqual(
+            poliza.aseguradora,
+            self.aseguradora,
+        )
+        self.assertEqual(
+            poliza.producto,
+            self.producto,
+        )
+        self.assertIsNone(poliza.fecha_emision)
+
+        self.assertTrue(
+            poliza.numero_poliza.startswith("PEND-COT-")
+        )
+
+        evento = poliza.eventos.get(
+            tipo=PolizaEvento.Tipo.CREADA,
+        )
+
+        self.assertEqual(
+            evento.dedupe_key,
+            f"POLIZA_CREADA:{poliza.id}",
+        )
+
+    def test_prepare_is_idempotent_for_same_cotizacion_item(self):
+        first = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        second = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        self.assertEqual(first.id, second.id)
+
+        self.assertEqual(
+            Poliza.objects.filter(
+                cotizacion_item=self.item,
+            ).count(),
+            1,
+        )
+
+        self.assertEqual(
+            PolizaEvento.objects.filter(
+                poliza=first,
+                tipo=PolizaEvento.Tipo.CREADA,
+            ).count(),
+            1,
+        )
+
+    def test_prepared_policy_can_create_pending_payment(self):
+        poliza = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        created = crear_plan_pagos(
+            poliza,
+            overwrite=False,
+        )
+
+        self.assertEqual(created, 1)
+
+        pago = Pago.objects.get(poliza=poliza)
+
+        self.assertEqual(
+            pago.estatus,
+            Pago.Estatus.PENDIENTE,
+        )
+        self.assertEqual(
+            pago.cliente,
+            self.cliente,
+        )
+        self.assertEqual(
+            pago.monto,
+            Decimal("41180.00"),
+        )
+        self.assertEqual(
+            pago.moneda,
+            "MXN",
+        )
+
+    def test_payment_plan_is_idempotent_for_prepared_policy(self):
+        poliza = PolicyPreparationService.prepare(
+            cotizacion_item=self.item,
+        )
+
+        first_created = crear_plan_pagos(
+            poliza,
+            overwrite=False,
+        )
+
+        second_created = crear_plan_pagos(
+            poliza,
+            overwrite=False,
+        )
+
+        self.assertEqual(first_created, 1)
+        self.assertEqual(second_created, 0)
+
+        self.assertEqual(
+            Pago.objects.filter(
+                poliza=poliza,
+            ).count(),
+            1,
+        )
+
+        pago = Pago.objects.get(poliza=poliza)
+
+        self.assertEqual(
+            pago.estatus,
+            Pago.Estatus.PENDIENTE,
+        )
+
+#**
+
+class PortalDocumentApplicationServiceTests(TestCase):
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(
+            tipo_cliente=Cliente.TipoCliente.PERSONA,
+            nombre="Miguel",
+            email_principal="miguel@example.com",
+        )
+
+        self.vehiculo = Vehiculo.objects.create(
+            cliente=self.cliente,
+            marca_texto="ACURA",
+            submarca_texto="TL",
+            modelo_anio=2015,
+            version="SEDAN 3.7L AUT",
+            placas="TR543",
+            vin="JH4KA3277KC007500",
+        )
+
+        hoy = timezone.localdate()
+
+        self.cotizacion = Cotizacion.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            flotilla=None,
+            tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+            vigencia_desde=hoy,
+            vigencia_hasta=hoy + timedelta(days=365),
+            forma_pago_preferida="CONTADO",
+        )
+
+        self.provider_quote = (
+            CotizacionProveedor.objects.create(
+                cotizacion=self.cotizacion,
+                provider_code="CHUBB",
+                provider_configuration_id=77,
+                success=True,
+                elapsed_ms=100,
+                provider_quote_id="2061261215",
+                provider_quote_version_id="2061499999",
+                currency="MXN",
+                total_premium=Decimal("41582.77"),
+            )
+        )
+
+        self.provider_risk = (
+            CotizacionProveedorRiesgo.objects.create(
+                cotizacion_proveedor=self.provider_quote,
+                provider_risk_id="2061426582",
+                risk_number=1,
+                vehicle_key="01010100101",
+            )
+        )
+
+        self.provider_option = (
+            CotizacionProveedorOpcion.objects.create(
+                cotizacion_proveedor=self.provider_quote,
+                riesgo=self.provider_risk,
+                code="1",
+                provider_package_id="1",
+                name="AMPLIA",
+                total_premium=Decimal("41582.77"),
+                currency="MXN",
+                selected=True,
+            )
+        )
+
+        self.aseguradora = Aseguradora.objects.create(
+            nombre="Chubb Document Application Test",
+        )
+
+        self.producto = ProductoSeguro.objects.create(
+            aseguradora=self.aseguradora,
+            nombre_producto="Autos",
+            tipo_producto=ProductoSeguro.TipoProducto.AUTO,
+            modelo_calculo=ProductoSeguro.ModeloCalculo.SIMPLE,
+        )
+
+        self.item = CotizacionItem.objects.create(
+            cotizacion=self.cotizacion,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            provider_option=self.provider_option,
+            prima_total=Decimal("41582.77"),
+            forma_pago="CONTADO",
+            provider="CHUBB",
+            provider_quote_id="2061261215",
+            paquete_nombre="AMPLIA",
+        )
+
+        self.poliza = Poliza.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            cotizacion_item=self.item,
+            numero_poliza="PEND-CHUBB-99007704",
+            fecha_emision=hoy,
+            vigencia_desde=self.cotizacion.vigencia_desde,
+            vigencia_hasta=self.cotizacion.vigencia_hasta,
+            estatus=Poliza.Estatus.EN_PROCESO,
+            prima_total=Decimal("41582.77"),
+            forma_pago="CONTADO",
+        )
+
+        self.poliza_proveedor = (
+            PolizaProveedor.objects.create(
+                poliza=self.poliza,
+                provider_code="CHUBB",
+                provider_policy_id="99007704",
+                provider_policy_key="M6",
+                currency="MXN",
+                raw_response={},
+            )
+        )
+
+        self.configuration_service = Mock()
+
+        self.configuration = Mock()
+        self.configuration.provider = "CHUBB"
+        self.configuration.ambiente = "SIT"
+        self.configuration.ramo = "AUTOS"
+
+        self.configuration_service.get_by_id.return_value = (
+            self.configuration
+        )
+
+        self.resolver_factory = Mock()
+        self.resolver = Mock()
+
+        self.provider = Mock()
+        self.provider.provider_code = "CHUBB"
+
+        self.resolver_factory.return_value = self.resolver
+        self.resolver.build.return_value = self.provider
+
+        self.document_service_factory = Mock()
+        self.document_service = Mock()
+
+        self.document_service_factory.return_value = (
+            self.document_service
+        )
+
+    def test_get_policy_documents_coordinates_complete_flow(
+        self,
+    ):
+        expected_result = Mock()
+
+        self.document_service.get_policy_documents.return_value = (
+            expected_result
+        )
+
+        result = (
+            PortalDocumentApplicationService
+            .get_policy_documents(
+                poliza=self.poliza,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+            )
+        )
+
+        self.configuration_service.get_by_id.assert_called_once_with(
+            77,
+        )
+
+        self.resolver_factory.assert_called_once_with(
+            configuration_service=(
+                self.configuration_service
+            ),
+        )
+
+        self.resolver.build.assert_called_once_with(
+            provider_code="CHUBB",
+            ambiente="SIT",
+            ramo="AUTOS",
+            configuration=self.configuration,
+        )
+
+        self.document_service_factory.assert_called_once_with(
+            providers=[self.provider],
+        )
+
+        expected_request = PolicyDocumentRequest(
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            risk_number=1,
+        )
+
+        self.document_service.get_policy_documents.assert_called_once_with(
+            "CHUBB",
+            expected_request,
+        )
+
+        self.assertIs(
+            result,
+            expected_result,
+        )
+
+    def test_get_policy_documents_allows_missing_risk(
+        self,
+    ):
+        self.provider_option.riesgo = None
+        self.provider_option.save(
+            update_fields=["riesgo"],
+        )
+
+        expected_result = Mock()
+
+        self.document_service.get_policy_documents.return_value = (
+            expected_result
+        )
+
+        PortalDocumentApplicationService.get_policy_documents(
+            poliza=self.poliza,
+            configuration_service=self.configuration_service,
+            resolver_factory=self.resolver_factory,
+            document_service_factory=(
+                self.document_service_factory
+            ),
+        )
+
+        expected_request = PolicyDocumentRequest(
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            risk_number=None,
+        )
+
+        self.document_service.get_policy_documents.assert_called_once_with(
+            "CHUBB",
+            expected_request,
+        )
+
+    def test_get_policy_documents_rejects_provider_mismatch(
+        self,
+    ):
+        self.provider_quote.provider_code = "OTRO"
+        self.provider_quote.save(
+            update_fields=["provider_code"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no corresponde",
+        ):
+            PortalDocumentApplicationService.get_policy_documents(
+                poliza=self.poliza,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+            )
+
+        self.configuration_service.get_by_id.assert_not_called()
+
+    def test_get_policy_documents_requires_configuration_id(
+        self,
+    ):
+        self.provider_quote.provider_configuration_id = None
+        self.provider_quote.save(
+            update_fields=["provider_configuration_id"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no tiene provider_configuration_id",
+        ):
+            PortalDocumentApplicationService.get_policy_documents(
+                poliza=self.poliza,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+            )
+
+        self.configuration_service.get_by_id.assert_not_called()
+
+    def test_get_policy_documents_requires_policy_key(
+        self,
+    ):
+        self.poliza_proveedor.provider_policy_key = ""
+        self.poliza_proveedor.save(
+            update_fields=["provider_policy_key"],
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no tiene provider_policy_key",
+        ):
+            PortalDocumentApplicationService.get_policy_documents(
+                poliza=self.poliza,
+                configuration_service=(
+                    self.configuration_service
+                ),
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+            )
+
+        self.document_service.get_policy_documents.assert_not_called()
+
+    def test_get_and_persist_policy_document_coordinates_flow(
+        self,
+    ):
+        policy_document = PolicyDocument(
+            order_id="1",
+            file_name="M699007704_00001.pdf",
+            content=b"%PDF-1.4 test",
+        )
+
+        expected_result = PolicyDocumentResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            documents=(policy_document,),
+        )
+
+        self.document_service.get_policy_documents.return_value = (
+            expected_result
+        )
+
+        persistence_service = Mock()
+        expected_documento = Mock()
+        persistence_service.persist.return_value = expected_documento
+
+        result = (
+            PortalDocumentApplicationService
+            .get_and_persist_policy_document(
+                poliza=self.poliza,
+                configuration_service=self.configuration_service,
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+                persistence_service=persistence_service,
+            )
+        )
+
+        persistence_service.persist.assert_called_once_with(
+            poliza=self.poliza,
+            document=policy_document,
+            subido_por=None,
+        )
+
+        self.assertIs(
+            result,
+            expected_documento,
+        )
+
+    def test_get_and_persist_policy_document_rejects_no_documents(
+        self,
+    ):
+        expected_result = PolicyDocumentResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            documents=(),
+        )
+
+        self.document_service.get_policy_documents.return_value = (
+            expected_result
+        )
+
+        persistence_service = Mock()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no devolvió documentos",
+        ):
+            (
+                PortalDocumentApplicationService
+                .get_and_persist_policy_document(
+                    poliza=self.poliza,
+                    configuration_service=(
+                        self.configuration_service
+                    ),
+                    resolver_factory=self.resolver_factory,
+                    document_service_factory=(
+                        self.document_service_factory
+                    ),
+                    persistence_service=persistence_service,
+                )
+            )
+
+        persistence_service.persist.assert_not_called()
+
+    def test_get_and_persist_policy_document_rejects_multiple_documents(
+        self,
+    ):
+        first = PolicyDocument(
+            order_id="1",
+            file_name="policy.pdf",
+            content=b"%PDF-1.4 policy",
+        )
+
+        second = PolicyDocument(
+            order_id="2",
+            file_name="receipt.pdf",
+            content=b"%PDF-1.4 receipt",
+        )
+
+        expected_result = PolicyDocumentResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            documents=(first, second),
+        )
+
+        self.document_service.get_policy_documents.return_value = (
+            expected_result
+        )
+
+        persistence_service = Mock()
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "más de un documento",
+        ):
+            (
+                PortalDocumentApplicationService
+                .get_and_persist_policy_document(
+                    poliza=self.poliza,
+                    configuration_service=(
+                        self.configuration_service
+                    ),
+                    resolver_factory=self.resolver_factory,
+                    document_service_factory=(
+                        self.document_service_factory
+                    ),
+                    persistence_service=persistence_service,
+                )
+            )
+
+        persistence_service.persist.assert_not_called()
+
+    def test_get_and_persist_policy_document_retries_once_on_timeout(
+        self,
+    ):
+        policy_document = PolicyDocument(
+            order_id="1",
+            file_name="M699007704_00001.pdf",
+            content=b"%PDF-1.4 test",
+        )
+
+        expected_result = PolicyDocumentResult(
+            provider_code="CHUBB",
+            provider_policy_id="99007704",
+            provider_policy_key="M6",
+            documents=(policy_document,),
+        )
+
+        self.document_service.get_policy_documents.side_effect = [
+            ProviderHttpTimeoutError("timeout"),
+            expected_result,
+        ]
+
+        persistence_service = Mock()
+        expected_documento = Mock()
+        persistence_service.persist.return_value = (
+            expected_documento
+        )
+
+        result = (
+            PortalDocumentApplicationService
+            .get_and_persist_policy_document(
+                poliza=self.poliza,
+                configuration_service=self.configuration_service,
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+                persistence_service=persistence_service,
+            )
+        )
+
+        self.assertEqual(
+            self.document_service.get_policy_documents.call_count,
+            2,
+        )
+
+        persistence_service.persist.assert_called_once_with(
+            poliza=self.poliza,
+            document=policy_document,
+            subido_por=None,
+        )
+
+        self.assertIs(
+            result,
+            expected_documento,
+        )
+
+    def test_get_and_persist_policy_document_propagates_second_timeout(
+        self,
+    ):
+        self.document_service.get_policy_documents.side_effect = [
+            ProviderHttpTimeoutError("timeout 1"),
+            ProviderHttpTimeoutError("timeout 2"),
+        ]
+
+        persistence_service = Mock()
+
+        with self.assertRaises(ProviderHttpTimeoutError):
+            (
+                PortalDocumentApplicationService
+                .get_and_persist_policy_document(
+                    poliza=self.poliza,
+                    configuration_service=(
+                        self.configuration_service
+                    ),
+                    resolver_factory=self.resolver_factory,
+                    document_service_factory=(
+                        self.document_service_factory
+                    ),
+                    persistence_service=persistence_service,
+                )
+            )
+
+        self.assertEqual(
+            self.document_service.get_policy_documents.call_count,
+            2,
+        )
+
+        persistence_service.persist.assert_not_called()
+
+    def test_get_and_persist_policy_document_returns_existing_document(
+        self,
+    ):
+        documento = Documento.objects.create(
+            nombre_archivo="existing.pdf",
+            tipo=Documento.Tipo.PDF,
+            file="docs/existing.pdf",
+            tamano=100,
+            hash="a" * 64,
+        )
+
+        self.poliza.documento = documento
+        self.poliza.save(
+            update_fields=[
+                "documento",
+                "updated_at",
+            ]
+        )
+
+        persistence_service = Mock()
+
+        result = (
+            PortalDocumentApplicationService
+            .get_and_persist_policy_document(
+                poliza=self.poliza,
+                configuration_service=self.configuration_service,
+                resolver_factory=self.resolver_factory,
+                document_service_factory=(
+                    self.document_service_factory
+                ),
+                persistence_service=persistence_service,
+            )
+        )
+
+        self.assertEqual(
+            result.id,
+            documento.id,
+        )
+
+        self.document_service.get_policy_documents.assert_not_called()
+        persistence_service.persist.assert_not_called()
+
+
+class PolicyDocumentPersistenceServiceTests(TestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.media_root = tempfile.mkdtemp()
+
+        self.cliente = Cliente.objects.create(
+            tipo_cliente=Cliente.TipoCliente.PERSONA,
+            nombre="Miguel",
+            email_principal="miguel@example.com",
+        )
+
+        self.vehiculo = Vehiculo.objects.create(
+            cliente=self.cliente,
+            marca_texto="ACURA",
+            submarca_texto="TL",
+            modelo_anio=2015,
+            version="SEDAN 3.7L AUT",
+            placas="TR543",
+            vin="JH4KA3277KC007500",
+        )
+
+        hoy = timezone.localdate()
+
+        self.cotizacion = Cotizacion.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            flotilla=None,
+            tipo_cotizacion=Cotizacion.Tipo.INDIVIDUAL,
+            vigencia_desde=hoy,
+            vigencia_hasta=hoy + timedelta(days=365),
+            forma_pago_preferida="CONTADO",
+        )
+
+        self.aseguradora = Aseguradora.objects.create(
+            nombre="Chubb Document Persistence Test",
+        )
+
+        self.producto = ProductoSeguro.objects.create(
+            aseguradora=self.aseguradora,
+            nombre_producto="Autos",
+            tipo_producto=ProductoSeguro.TipoProducto.AUTO,
+            modelo_calculo=ProductoSeguro.ModeloCalculo.SIMPLE,
+        )
+
+        self.item = CotizacionItem.objects.create(
+            cotizacion=self.cotizacion,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            prima_neta=Decimal("35000.00"),
+            derechos=Decimal("500.00"),
+            iva=Decimal("5680.00"),
+            prima_total=Decimal("41180.00"),
+            forma_pago="CONTADO",
+            provider="CHUBB",
+            provider_quote_id="2061261215",
+            paquete_nombre="AMPLIA",
+        )
+
+        self.poliza = Poliza.objects.create(
+            cliente=self.cliente,
+            vehiculo=self.vehiculo,
+            aseguradora=self.aseguradora,
+            producto=self.producto,
+            cotizacion_item=self.item,
+            numero_poliza="PEND-CHUBB-99007704",
+            vigencia_desde=self.cotizacion.vigencia_desde,
+            vigencia_hasta=self.cotizacion.vigencia_hasta,
+            estatus=Poliza.Estatus.EN_PROCESO,
+            prima_neta=Decimal("35247.21"),
+            gastos_expedicion=Decimal("600.00"),
+            subtotal=Decimal("35847.21"),
+            iva=Decimal("5735.56"),
+            prima_total=Decimal("41582.77"),
+            forma_pago="CONTADO",
+        )
+
+        self.policy_document = PolicyDocument(
+            order_id="1",
+            file_name="M699007704_00001.pdf",
+            content=b"%PDF-1.4 test document",
+        )
+    
+    def tearDown(self):
+        shutil.rmtree(
+            self.media_root,
+            ignore_errors=True,
+        )
+        super().tearDown()
+
+    def test_persist_creates_document_and_links_policy(self):
+        with override_settings(
+            MEDIA_ROOT=self.media_root,
+        ):
+            documento = (
+                PolicyDocumentPersistenceService.persist(
+                    poliza=self.poliza,
+                    document=self.policy_document,
+                )
+            )
+
+            self.poliza.refresh_from_db()
+
+            self.assertEqual(
+                self.poliza.documento_id,
+                documento.id,
+            )
+            self.assertEqual(
+                documento.nombre_archivo,
+                "M699007704_00001.pdf",
+            )
+            self.assertEqual(
+                documento.tipo,
+                Documento.Tipo.PDF,
+            )
+            self.assertEqual(
+                documento.tamano,
+                len(self.policy_document.content),
+            )
+            self.assertEqual(
+                documento.hash,
+                hashlib.sha256(
+                    self.policy_document.content
+                ).hexdigest(),
+            )
+
+            with documento.file.open("rb") as stored_file:
+                self.assertEqual(
+                    stored_file.read(),
+                    self.policy_document.content,
+                )
+
+    def test_persist_rejects_empty_content(self):
+        document = PolicyDocument(
+            order_id="1",
+            file_name="policy.pdf",
+            content=b"",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "no tiene contenido",
+        ):
+            PolicyDocumentPersistenceService.persist(
+                poliza=self.poliza,
+                document=document,
+            )
+
+    def test_persist_is_idempotent_for_same_document(self):
+        with override_settings(
+            MEDIA_ROOT=self.media_root,
+        ):
+            first = PolicyDocumentPersistenceService.persist(
+                poliza=self.poliza,
+                document=self.policy_document,
+            )
+
+            second = PolicyDocumentPersistenceService.persist(
+                poliza=self.poliza,
+                document=self.policy_document,
+            )
+
+            self.assertEqual(first.id, second.id)
+            self.assertEqual(
+                Documento.objects.count(),
+                1,
+            )
+
+            self.poliza.refresh_from_db()
+
+            self.assertEqual(
+                self.poliza.documento_id,
+                first.id,
+            )
+
+
+    def test_persist_rejects_different_existing_document(self):
+        with override_settings(
+            MEDIA_ROOT=self.media_root,
+        ):
+            first = PolicyDocumentPersistenceService.persist(
+                poliza=self.poliza,
+                document=self.policy_document,
+            )
+
+            different_document = PolicyDocument(
+                order_id="2",
+                file_name="different.pdf",
+                content=b"%PDF-1.4 different document",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "ya tiene un documento diferente",
+            ):
+                PolicyDocumentPersistenceService.persist(
+                    poliza=self.poliza,
+                    document=different_document,
+                )
+
+            self.assertEqual(
+                Documento.objects.count(),
+                1,
+            )
+
+            self.poliza.refresh_from_db()
+
+            self.assertEqual(
+                self.poliza.documento_id,
+                first.id,
             )

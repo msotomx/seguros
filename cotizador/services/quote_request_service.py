@@ -11,9 +11,12 @@ from integrations.quotes.contracts import (
     QuotePackageRequest,
     QuoteRisk,
     QuoteVehicle,
+    QuoteDiscountRequest,
 )
 from crm.models import CodigoPostal
-
+from integrations.catalog.quote_discount_service import (
+    QuoteDiscountService,
+)
 
 class QuoteRequestService:
     """
@@ -28,6 +31,7 @@ class QuoteRequestService:
     STATE_CATALOG_CODE = "STATE"
     MUNICIPALITY_CATALOG_CODE = "MUNICIPALITY"
     PACKAGE_CATALOG_CODE = "COVERAGE_PACKAGE"
+    DISCOUNT_CATALOG_CODE = "DISCOUNT"
 
     @classmethod
     def build(
@@ -38,6 +42,7 @@ class QuoteRequestService:
         package_code: str,
         garage: bool,
         catalog_service=CatalogService,
+        discount_service=QuoteDiscountService,
     ) -> InternalQuoteRequest:
 
         cls._validate(
@@ -87,6 +92,28 @@ class QuoteRequestService:
             internal_code=package_code,
         )
 
+        discount_codes = (
+            discount_service.list_internal_codes_for_provider(
+                provider_id=provider_id,
+            )
+        )
+
+        discounts = tuple(
+            QuoteDiscountRequest(
+                code=mapping.external_code,
+                name=mapping.external_name,
+                percentage=Decimal("0.00"),
+            )
+            for mapping in (
+                catalog_service.to_provider(
+                    provider_id=provider_id,
+                    catalog_code=cls.DISCOUNT_CATALOG_CODE,
+                    internal_code=discount_code,
+                )
+                for discount_code in discount_codes
+            )
+        )
+
         vehicle = QuoteVehicle(
             year=vehiculo.modelo_anio,
             vehicle_key=vehicle_mapping.external_code,
@@ -113,7 +140,7 @@ class QuoteRequestService:
             vehicle=vehicle,
             driver=driver,
             packages=(package,),
-            discounts=(),
+            discounts=discounts,
         )
 
         return InternalQuoteRequest(

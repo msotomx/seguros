@@ -26,31 +26,28 @@ class ChubbInternalIssueRequestMapper:
     Los identificadores propios de Chubb se reciben ya resueltos.
     Este mapper no consulta ORM, configuración ni catálogos.
     """
-
     def __init__(
         self,
         *,
-        payment_type_ids: Mapping[str, int],
-        legal_personality_ids: Mapping[str, int],
-        tax_regime_ids: Mapping[str, int],
-        cfdi_use_ids: Mapping[str, int],
+        legal_personality_ids: Mapping[str, int] | None = None,
+        tax_regime_ids: Mapping[str, int] | None = None,
+        cfdi_use_ids: Mapping[str, int] | None = None,
     ) -> None:
-        self._payment_type_ids = self._normalize_mapping(
-            payment_type_ids
-        )
         self._legal_personality_ids = self._normalize_mapping(
-            legal_personality_ids
+            legal_personality_ids or {}
         )
         self._tax_regime_ids = self._normalize_mapping(
-            tax_regime_ids
+            tax_regime_ids or {}
         )
         self._cfdi_use_ids = self._normalize_mapping(
-            cfdi_use_ids
+            cfdi_use_ids or {}
         )
 
     def issue(
         self,
         request: InternalIssueRequest,
+        *,
+        payment_type_id: int,
     ) -> ChubbIssueRequest:
         if not isinstance(
             request,
@@ -72,10 +69,14 @@ class ChubbInternalIssueRequestMapper:
                 request.provider_quote_id,
                 "provider_quote_id",
             ),
-            payment_type_id=self._mapped_id(
-                mapping=self._payment_type_ids,
-                code=request.payment_method_code,
-                description="forma de pago",
+#            payment_type_id=self._mapped_id( ***
+#                mapping=self._payment_type_ids,
+#                code=request.payment_method_code,
+#                description="forma de pago",
+#            ),
+            payment_type_id=self._positive_int(
+                payment_type_id,
+                "payment_type_id",
             ),
             insured=self._person(
                 request.insured,

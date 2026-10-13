@@ -133,12 +133,37 @@ class ChubbHttpClient:
             ) from exc
 
         if not response.ok:
+            print(
+                "CHUBB HTTP ERROR DEBUG:",
+                {
+                    "status_code": response.status_code,
+                    "content_type": response.headers.get(
+                        "Content-Type"
+                    ),
+                    "content_length": len(
+                        getattr(response, "content", b"") or b""
+                    ),
+                    "text": (
+                        getattr(response, "text", "") or ""
+                    )[:1000],
+                },
+            )
+
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = str(
+                    getattr(response, "text", "")
+                ).strip() or None
+
             raise ProviderHttpResponseError(
                 self._build_http_error_message(
                     method=normalized_method,
                     path=path,
                     response=response,
-                )
+                ),
+                status_code=response.status_code,
+                response_data=response_data,
             )
 
         data = self._parse_response(response)

@@ -34,6 +34,7 @@ class QuotePersistenceService:
         *,
         cotizacion: Cotizacion,
         attempt: QuoteAttempt,
+        provider_configuration_id: int | None = None,
         request_json: Mapping[str, Any] | None = None,
     ) -> CotizacionProveedor:
 
@@ -47,16 +48,30 @@ class QuotePersistenceService:
                 "attempt debe ser una instancia de QuoteAttempt."
             )
 
+        if (
+            provider_configuration_id is not None
+            and (
+                not isinstance(provider_configuration_id, int)
+                or provider_configuration_id <= 0
+            )
+        ):
+            raise ValueError(
+                "provider_configuration_id debe ser "
+                "un entero positivo."
+            )
+
         if attempt.success:
             return cls._persist_success(
                 cotizacion=cotizacion,
                 attempt=attempt,
+                provider_configuration_id=provider_configuration_id,
                 request_json=request_json,
             )
 
         return cls._persist_failure(
             cotizacion=cotizacion,
             attempt=attempt,
+            provider_configuration_id=provider_configuration_id,
             request_json=request_json,
         )
 
@@ -66,9 +81,10 @@ class QuotePersistenceService:
         *,
         cotizacion: Cotizacion,
         attempt: QuoteAttempt,
+        provider_configuration_id: int | None,
         request_json: Mapping[str, Any] | None,
     ) -> CotizacionProveedor:
-
+        
         result = attempt.result
 
         if result is None:
@@ -79,6 +95,7 @@ class QuotePersistenceService:
         registro = CotizacionProveedor.objects.create(
             cotizacion=cotizacion,
             provider_code=attempt.provider_code,
+            provider_configuration_id=provider_configuration_id,
             success=True,
             elapsed_ms=attempt.elapsed_ms,
 
@@ -131,6 +148,7 @@ class QuotePersistenceService:
         *,
         cotizacion: Cotizacion,
         attempt: QuoteAttempt,
+        provider_configuration_id: int | None,
         request_json: Mapping[str, Any] | None,
     ) -> CotizacionProveedor:
 
@@ -144,10 +162,16 @@ class QuotePersistenceService:
         return CotizacionProveedor.objects.create(
             cotizacion=cotizacion,
             provider_code=attempt.provider_code,
+            provider_configuration_id=provider_configuration_id,
             success=False,
             elapsed_ms=attempt.elapsed_ms,
 
             request_json=dict(request_json or {}),
+            response_json=(
+                error.response_data
+                if isinstance(error.response_data, dict)
+                else {}
+            ),
 
             error_message=error.message,
             error_type=error.error_type,

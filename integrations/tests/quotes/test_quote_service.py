@@ -5,7 +5,9 @@ from integrations.quotes.contracts import (
     QuoteResult,
 )
 from integrations.quotes.service import QuoteService
-
+from integrations.providers.exceptions import (
+    ProviderHttpResponseError,
+)
 
 class SuccessfulProvider:
     provider_code = "CHUBB"
@@ -55,6 +57,24 @@ class TimeoutProvider:
             "El proveedor no respondió."
         )
 
+class HttpErrorProvider:
+    provider_code = "CHUBB"
+
+    def quote(self, request):
+        raise ProviderHttpResponseError(
+            "Chubb devolvió HTTP 500 para POST /quote.",
+            status_code=500,
+            response_data={
+                "responseData": None,
+                "messages": [
+                    {
+                        "message": "Dato inválido",
+                        "messageCode": 1004,
+                        "messageType": 2,
+                    }
+                ],
+            },
+        )
 
 class QuoteServiceTests(TestCase):
     def test_requires_at_least_one_provider(self):
@@ -133,6 +153,37 @@ class QuoteServiceTests(TestCase):
         self.assertIn(
             "No fue posible",
             attempt.error.message,
+        )
+
+    def test_quote_one_preserves_http_error_response_data(self):
+        service = QuoteService(
+            [HttpErrorProvider()]
+        )
+
+        attempt = service.quote_one(
+            "CHUBB",
+            request={},
+        )
+
+        self.assertFalse(attempt.success)
+        self.assertIsNotNone(attempt.error)
+
+        self.assertEqual(
+            attempt.error.status_code,
+            500,
+        )
+        self.assertEqual(
+            attempt.error.response_data,
+            {
+                "responseData": None,
+                "messages": [
+                    {
+                        "message": "Dato inválido",
+                        "messageCode": 1004,
+                        "messageType": 2,
+                    }
+                ],
+            },
         )
 
     def test_timeout_is_retryable(self):

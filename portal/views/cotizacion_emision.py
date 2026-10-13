@@ -19,6 +19,20 @@ from portal.forms_emision import (
     CotizacionVehiculoForm,    
 )
 from crm.models import Direccion
+from cotizador.services.portal_issue_application_service import (
+    PortalIssueApplicationService,
+)
+from polizas.models import Poliza
+from cotizador.services.portal_document_application_service import (
+    PortalDocumentApplicationService,
+)
+from integrations.providers.exceptions import ProviderHttpError
+from cotizador.services.policy_preparation_service import (
+    PolicyPreparationService,
+)
+from finanzas.models import Pago
+from finanzas.services.pagos import crear_plan_pagos
+from finanzas.services.checkout import crear_checkout_pago
 
 
 class PublicCotizacionSessionMixin:
@@ -617,16 +631,144 @@ class PortalCotizacionResumenEmisionView(
                 pk=cotizacion.pk,
             )
 
+        precondition_redirect = (
+            self._get_precondition_redirect(
+                cotizacion,
+            )
+        )
+
+        if precondition_redirect is not None:
+            return precondition_redirect
+
+        poliza = (
+            Poliza.objects
+            .filter(cotizacion_item=item)
+            .first()
+        )
+
         cliente = cotizacion.cliente
         vehiculo = cotizacion.vehiculo
 
-        if (
-            cliente.direccion_contacto_id is None
-        ):
+        return render(
+            request,
+            self.template_name,
+            {
+                "cotizacion": cotizacion,
+                "item": item,
+                "cliente": cliente,
+                "direccion": (
+                    cliente.direccion_contacto
+                ),
+                "vehiculo": vehiculo,
+                "opcion": item.provider_option,
+                "poliza": poliza,
+            },
+        )
+
+    def post(
+        self,
+        request,
+        pk,
+    ):
+        cotizacion = self.get_cotizacion(
+            request,
+            pk,
+        )
+
+        if cotizacion is None:
+            return redirect(
+                "portal:cotizar"
+            )
+
+        item = self._get_selected_item(
+            request,
+            cotizacion,
+        )
+
+        if item is None:
+            return redirect(
+                "portal:cotizacion_opciones",
+                pk=cotizacion.pk,
+            )
+
+        precondition_redirect = (
+            self._get_precondition_redirect(
+                cotizacion,
+            )
+        )
+
+        if precondition_redirect is not None:
+            return precondition_redirect
+        
+        try:
+            poliza = PolicyPreparationService.prepare(
+                cotizacion_item=item,
+            )
+
+            crear_plan_pagos(
+                poliza,
+                overwrite=False,
+            )
+
+            pago = (
+                Pago.objects
+                .filter(poliza=poliza)
+                .exclude(
+                    estatus=Pago.Estatus.CANCELADO,
+                )
+                .order_by("id")
+                .first()
+            )
+
+            if pago is None:
+                raise ValueError(
+                    "No fue posible preparar el pago."
+                )
+
+            checkout = crear_checkout_pago(
+                pago=pago,
+                request=request,
+                actor=None,
+            )
+
+            checkout_url = checkout.get(
+                "checkout_url"
+            )
+
+            if not checkout_url:
+                raise ValueError(
+                    "El checkout no devolvió una URL."
+                )
+
+        except ValueError:
+            messages.error(
+                request,
+                (
+                    "No fue posible iniciar el pago. "
+                    "Intenta nuevamente más tarde."
+                ),
+            )
+
+            return redirect(
+                "portal:cotizacion_resumen_emision",
+                pk=cotizacion.pk,
+            )
+
+        return redirect(checkout_url)
+
+    @staticmethod
+    def _get_precondition_redirect(
+        cotizacion,
+    ):
+        cliente = cotizacion.cliente
+
+        if cliente.direccion_contacto_id is None:
             return redirect(
                 "portal:cotizacion_direccion",
                 pk=cotizacion.pk,
             )
+
+        vehiculo = cotizacion.vehiculo
 
         if (
             not vehiculo.placas.strip()
@@ -648,20 +790,7 @@ class PortalCotizacionResumenEmisionView(
                 pk=cotizacion.pk,
             )
 
-        return render(
-            request,
-            self.template_name,
-            {
-                "cotizacion": cotizacion,
-                "item": item,
-                "cliente": cliente,
-                "direccion": (
-                    cliente.direccion_contacto
-                ),
-                "vehiculo": vehiculo,
-                "opcion": item.provider_option,
-            },
-        )
+        return None
 
     @staticmethod
     def _get_selected_item(
